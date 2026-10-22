@@ -8,7 +8,7 @@ import Icon from './Icon'
 
 const VAZIO = {
   prontuario: '', iniciais: '', data_nascimento: '', data_atendimento: '', risco: null, setor: null,
-  especialidades: [], cid: '', exames: '', medicacoes: '', desfecho: null, observacoes: '',
+  especialidades: [], cid: '', exames_grupos: [], exames: '', medicacoes_classes: [], medicacoes: '', desfecho: null, observacoes: '',
 }
 
 export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, onSaved }) {
@@ -16,10 +16,13 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
   const [f, setF] = useState(VAZIO)
   const [erros, setErros] = useState({})
   const [salvando, setSalvando] = useState(false)
+  const [buscaMed, setBuscaMed] = useState('')
+  const [todasMed, setTodasMed] = useState(false)
 
   useEffect(() => {
     if (!open) return
     setErros({})
+    setBuscaMed(''); setTodasMed(false)
     setF(inicial
       ? { ...VAZIO, ...Object.fromEntries(Object.entries(inicial).map(([k, v]) => [k, v ?? VAZIO[k] ?? ''])) }
       : { ...VAZIO, data_atendimento: dataPadrao || hojeISO() })
@@ -45,7 +48,9 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
     for (const { key } of CAMPOS) {
       if (!vis(key) || !obr(key)) continue
       const v = f[key]
-      if (Array.isArray(v) ? v.length === 0 : !String(v ?? '').trim()) e[key] = 'Campo obrigatório'
+      const lista = key === 'exames' ? f.exames_grupos : key === 'medicacoes' ? f.medicacoes_classes : null
+      if (lista?.length) continue
+      if (Array.isArray(v) ? v.length === 0 : !String(v ?? '').trim()) e[key] = lista ? 'Selecione ao menos uma opção' : 'Campo obrigatório'
     }
     if (f.data_nascimento && f.data_atendimento && f.data_nascimento > f.data_atendimento) e.data_nascimento = 'Data posterior ao atendimento'
     if (f.data_atendimento && f.data_atendimento > hojeISO()) e.data_atendimento = 'Data futura não permitida'
@@ -71,6 +76,12 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
     } catch (err) { toast(err.message, 'erro') } finally { setSalvando(false) }
   }
 
+  const toggleLista = (k, nome) => {
+    const atual = f[k] || []
+    set(k, atual.includes(nome) ? atual.filter((x) => x !== nome) : [...atual, nome])
+    if (k === 'exames_grupos' && erros.exames) setErros((e) => ({ ...e, exames: null }))
+    if (k === 'medicacoes_classes' && erros.medicacoes) setErros((e) => ({ ...e, medicacoes: null }))
+  }
   const toggleEsp = (nome) => {
     const atual = f.especialidades || []
     if (!config.especialidadesMultiplas) return set('especialidades', atual.includes(nome) ? [] : [nome])
@@ -158,15 +169,54 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
             </Field>
           )}
           {vis('exames') && (
-            <Field label={label('exames')} obrigatorio={obr('exames')} erro={erros.exames}>
-              <textarea rows={2} value={f.exames} onChange={(e) => set('exames', e.target.value)} placeholder="Ex.: Hemograma, PCR, TC de abdome" />
+            <Field label={label('exames')} obrigatorio={obr('exames')} erro={erros.exames}
+              hint={f.exames_grupos?.length ? `${f.exames_grupos.length} família(s) selecionada(s)` : 'Toque nas famílias de exames solicitadas'}>
+              <div className="chips">
+                {opcoes('exame', f.exames_grupos).map((s) => {
+                  const on = f.exames_grupos?.includes(s.nome)
+                  return (
+                    <button type="button" key={s.id} className={'chip' + (on ? ' on' : '')} aria-pressed={on}
+                      onClick={() => toggleLista('exames_grupos', s.nome)}>{on && <Icon name="check" size={14} />}{s.nome}</button>
+                  )
+                })}
+              </div>
+              <textarea rows={2} className="mt-xs" value={f.exames} onChange={(e) => set('exames', e.target.value)} placeholder="Detalhar (opcional) — ex.: hemograma, PCR, TC de crânio" />
             </Field>
           )}
-          {vis('medicacoes') && (
-            <Field label={label('medicacoes')} obrigatorio={obr('medicacoes')} erro={erros.medicacoes}>
-              <textarea rows={2} value={f.medicacoes} onChange={(e) => set('medicacoes', e.target.value)} placeholder="Ex.: Dipirona 1g EV, Ondansetrona 8mg EV" />
-            </Field>
-          )}
+          {vis('medicacoes') && (() => {
+            const lista = opcoes('medicacao', f.medicacoes_classes)
+            const q = buscaMed.trim().toLowerCase()
+            const LIMITE = 10
+            const filtrada = q ? lista.filter((m) => m.nome.toLowerCase().includes(q)) : lista
+            const sel = f.medicacoes_classes || []
+            // sem busca: mostra as 10 primeiras + as já selecionadas; "ver todas" expande
+            const visiveis = q || todasMed ? filtrada : filtrada.filter((m, i) => i < LIMITE || sel.includes(m.nome))
+            const ocultas = filtrada.length - visiveis.length
+            return (
+              <Field label={label('medicacoes')} obrigatorio={obr('medicacoes')} erro={erros.medicacoes}
+                hint={sel.length ? `${sel.length} classe(s) selecionada(s)` : 'Toque nas classes de medicamentos utilizadas'}>
+                {lista.length > LIMITE && (
+                  <div className="search search-sm">
+                    <Icon name="search" size={16} />
+                    <input value={buscaMed} onChange={(e) => setBuscaMed(e.target.value)} placeholder="Buscar classe (ex.: opioide, antiem…)" />
+                  </div>
+                )}
+                <div className="chips chips-sm">
+                  {visiveis.map((m) => {
+                    const on = sel.includes(m.nome)
+                    return (
+                      <button type="button" key={m.id} className={'chip' + (on ? ' on' : '')} aria-pressed={on}
+                        onClick={() => toggleLista('medicacoes_classes', m.nome)}>{on && <Icon name="check" size={14} />}{m.nome}</button>
+                    )
+                  })}
+                  {!q && ocultas > 0 && <button type="button" className="chip chip-more" onClick={() => setTodasMed(true)}>+ {ocultas} classes</button>}
+                  {!q && todasMed && lista.length > LIMITE && <button type="button" className="chip chip-more" onClick={() => setTodasMed(false)}>Mostrar menos</button>}
+                  {q && filtrada.length === 0 && <span className="muted small">Nenhuma classe encontrada.</span>}
+                </div>
+                <textarea rows={2} className="mt-xs" value={f.medicacoes} onChange={(e) => set('medicacoes', e.target.value)} placeholder="Detalhar (opcional) — ex.: dipirona 1g EV, ondansetrona 8mg EV" />
+              </Field>
+            )
+          })()}
         </section>
 
         <section className="form-sec">

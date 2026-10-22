@@ -4,7 +4,39 @@ export const TIPOS_PARAMETRO = [
   { tipo: 'risco', titulo: 'Classificação de risco', usaCor: true },
   { tipo: 'setor', titulo: 'Setor' },
   { tipo: 'especialidade', titulo: 'Apoio de especialista' },
+  { tipo: 'exame', titulo: 'Exames (famílias)' },
+  { tipo: 'medicacao', titulo: 'Medicações (classes)' },
   { tipo: 'desfecho', titulo: 'Desfecho' },
+]
+
+export const EXAMES_PADRAO = ['Exames Laboratoriais', 'RX', 'TC', 'USG', 'ECG']
+export const MEDICACOES_PADRAO = [
+  'Analgésicos e antitérmicos',
+  'Anti-inflamatórios não esteroides (AINEs)',
+  'Opioides',
+  'Antimicrobianos',
+  'Corticosteroides',
+  'Antialérgicos / anti-histamínicos',
+  'Broncodilatadores',
+  'Antieméticos',
+  'Antiespasmódicos',
+  'Medicamentos para doenças relacionadas à acidez',
+  'Laxantes',
+  'Anti-hipertensivos e vasodilatadores',
+  'Diuréticos',
+  'Antiarrítmicos',
+  'Vasopressores e inotrópicos',
+  'Antiagregantes plaquetários',
+  'Anticoagulantes',
+  'Fibrinolíticos',
+  'Hemostáticos e antifibrinolíticos',
+  'Anticonvulsivantes',
+  'Sedativos e ansiolíticos',
+  'Anestésicos',
+  'Bloqueadores neuromusculares',
+  'Antipsicóticos',
+  'Insulinas e medicamentos para hipoglicemia',
+  'Soluções intravenosas e eletrólitos',
 ]
 
 export const PARAMETROS_PADRAO = [
@@ -28,6 +60,8 @@ export const PARAMETROS_PADRAO = [
   { tipo: 'desfecho', nome: 'Alta médica' },
   { tipo: 'desfecho', nome: 'Transferência' },
   { tipo: 'desfecho', nome: 'Internação' },
+  ...EXAMES_PADRAO.map((nome) => ({ tipo: 'exame', nome })),
+  ...MEDICACOES_PADRAO.map((nome) => ({ tipo: 'medicacao', nome })),
 ].map((p, i) => ({ ...p, ordem: i, ativo: true }))
 
 // Campos do checklist (colunas da aba "Checklist de Atendimento")

@@ -28,6 +28,7 @@ export default function Analytics() {
   }, [ant.de, iv.ate, toast])
 
   const riscos = ativos('risco'), desfechos = ativos('desfecho'), especialidades = ativos('especialidade'), setores = ativos('setor')
+  const examesP = ativos('exame'), medsP = ativos('medicacao')
 
   const A = useMemo(() => {
     if (!bruto) return null
@@ -42,6 +43,21 @@ export default function Analytics() {
       .map((nome) => ({ nome, valor: espAt.get(nome) || 0, antes: espAn.get(nome) || 0 }))
       .sort((a, b) => b.valor - a.valor)
 
+    // Exames por família e classes de medicação (% dos atendimentos, com variação)
+    const porLista = (campo, params) => {
+      const cAt = contar(atual, (a) => a[campo]), cAn = contar(anterior, (a) => a[campo])
+      return [...new Set([...params.map((e) => e.nome), ...cAt.keys()])]
+        .map((nome) => ({ nome, valor: cAt.get(nome) || 0, antes: cAn.get(nome) || 0 }))
+        .sort((a, b) => b.valor - a.valor)
+    }
+    const exames = porLista('exames_grupos', examesP)
+    const meds_ = porLista('medicacoes_classes', medsP)
+    const media = (l, campo) => (l.length ? l.reduce((s, a) => s + (a[campo]?.length || 0), 0) / l.length : null)
+    const comExame = atual.filter((a) => a.exames_grupos?.length).length
+    const mtzExame = riscos.map((rk) => {
+      const l = atual.filter((a) => a.risco === rk.nome)
+      return { ...rk, total: l.length, celulas: examesP.map((e) => ({ nome: e.nome, valor: l.filter((a) => a.exames_grupos?.includes(e.nome)).length })) }
+    })
     const cids = [...contar(atual, (a) => a.cid).entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([nome, valor]) => ({ nome, valor }))
     const idades = atual.map((a) => idade(a.data_nascimento, a.data_atendimento))
     const faixas = FAIXAS.map(([nome, lo, hi]) => ({ nome, valor: idades.filter((x) => x != null && x >= lo && x <= hi).length }))
@@ -57,6 +73,7 @@ export default function Analytics() {
         nome, total: l.length, dias, porDia: l.length / dias,
         graves: l.filter(grave).length / l.length,
         esp: l.filter((a) => a.especialidades?.length).length / l.length,
+        exames: media(l, 'exames_grupos'),
         pend: l.filter((a) => !a.desfecho).length / l.length,
       }
     }).sort((a, b) => b.total - a.total)
@@ -77,6 +94,10 @@ export default function Analytics() {
     }
     if (r.evasao != null && r.evasao >= 0.05) ins.push({ tom: 'alerta', txt: `Evasão + alta a pedido em ${pct(r.evasao, 1)} dos desfechos — acima da referência de 5%. Vale revisar tempo de espera e comunicação.` })
     if (r.completude != null && r.completude < 0.95) ins.push({ tom: 'alerta', txt: `${pct(1 - r.completude, 1)} dos registros ainda estão sem desfecho. Reforce o fechamento do checklist ao fim do plantão.` })
+    if (exames[0]?.valor) ins.push({ tom: 'info', txt: `${pct(comExame / atual.length)} dos atendimentos solicitaram exames (média de ${num(media(atual, 'exames_grupos'))} famílias por paciente); ${exames[0].nome} é a mais solicitada (${pct(exames[0].valor / atual.length)}).` })
+    const img = atual.filter((a) => (a.exames_grupos || []).some((x) => /^(RX|TC|USG)$/i.test(x))).length
+    if (img) ins.push({ tom: 'info', txt: `Exames de imagem (RX, TC ou USG) em ${pct(img / atual.length)} dos atendimentos.` })
+    if (meds_[0]?.valor) ins.push({ tom: 'info', txt: `Classes de medicação mais usadas: ${meds_.slice(0, 3).filter((m) => m.valor).map((m) => `${m.nome} (${pct(m.valor / atual.length)})`).join(', ')}.` })
     const pico = [...dow].sort((a, b) => b.valor - a.valor)[0]
     if (pico?.valor && medDow) ins.push({ tom: 'info', txt: `${pico.nome} é o dia de maior demanda (média de ${num(pico.valor)} atendimentos, ${pct(pico.valor / medDow - 1)} acima da média semanal) — considere reforço de escala.` })
     const rInt = mtzRisco.map((l) => ({ nome: l.nome, t: l.total, v: l.total ? l.celulas.filter((c) => /interna|transfer/i.test(c.nome)).reduce((s, c) => s + c.valor, 0) / l.total : 0 })).filter((x) => x.t >= 5).sort((a, b) => b.v - a.v)[0]
@@ -85,7 +106,7 @@ export default function Analytics() {
     if (mPend) ins.push({ tom: 'alerta', txt: `${nomeCurto(mPend.nome)} tem ${pct(mPend.pend)} dos registros sem desfecho.` })
 
     return {
-      atual, r, p, esp, cids, faixas, semIdade, dow, medDow, meds, mtzRisco, mtzSetor, ins,
+      atual, r, p, esp, exames, meds_, mtzExame, comExame, mediaExames: media(atual, 'exames_grupos'), mediaMeds: media(atual, 'medicacoes_classes'), cids, faixas, semIdade, dow, medDow, meds, mtzRisco, mtzSetor, ins,
       serie: serieDiaria(atual, iv.de, iv.ate),
       mix: mixPorSemana(atual, riscos),
     }
@@ -159,7 +180,7 @@ export default function Analytics() {
                     <li key={e.nome}>
                       <div className="bl-row">
                         <span className="bl-name">{e.nome}</span>
-                        <span className="bl-val">{e.valor} <Delta atual={e.valor} anterior={e.antes} tipo="rel" /></span>
+                        <span className="bl-val">{e.valor} {e.antes >= 5 && <Delta atual={e.valor} anterior={e.antes} tipo="rel" />}</span>
                       </div>
                       <div className="bl-track"><div className="bl-bar" style={{ width: `${(e.valor / max) * 100}%` }} /></div>
                     </li>
@@ -177,11 +198,30 @@ export default function Analytics() {
               <BarList itens={A.cids} total={A.atual.length} vazio="Nenhum CID informado" />
             </section>
 
+            <section className="card">
+              <h2 className="card-title">Exames por família</h2>
+              <p className="muted small mb-s">% dos atendimentos · média de {num(A.mediaExames)} família(s) por paciente</p>
+              <ListaDelta itens={A.exames} total={A.atual.length} vazio="Nenhum exame registrado" />
+            </section>
+            <section className="card span-2">
+              <h2 className="card-title">Uso de exames por classificação de risco</h2>
+              <p className="muted small mb-s">% dos pacientes de cada classificação que solicitaram a família de exame</p>
+              <Matriz linhas={A.mtzExame} colunas={examesP} rotuloLinha="Risco" />
+            </section>
+
+            <section className="card span-3">
+              <h2 className="card-title">Classes de medicação mais utilizadas</h2>
+              <p className="muted small mb-s">% dos atendimentos · média de {num(A.mediaMeds)} classe(s) por paciente</p>
+              <div className="cols-2-list">
+                <ListaDelta itens={A.meds_.filter((m) => m.valor || m.antes)} total={A.atual.length} vazio="Nenhuma medicação registrada" />
+              </div>
+            </section>
+
             <section className="card span-3">
               <h2 className="card-title">Desempenho por médico</h2>
               <div className="table-wrap flat">
                 <table className="table">
-                  <thead><tr><th>Médico</th><th className="num">Atend.</th><th className="num">Plantões</th><th className="num">Média/plantão</th><th className="num">% graves</th><th className="num">% especialista</th><th className="num">% sem desfecho</th></tr></thead>
+                  <thead><tr><th>Médico</th><th className="num">Atend.</th><th className="num">Plantões</th><th className="num">Média/plantão</th><th className="num">% graves</th><th className="num">% especialista</th><th className="num">Exames/atend.</th><th className="num">% sem desfecho</th></tr></thead>
                   <tbody>
                     {A.meds.map((m) => (
                       <tr key={m.nome} className="no-click">
@@ -191,6 +231,7 @@ export default function Analytics() {
                         <td className="num">{num(m.porDia)}</td>
                         <td className="num">{pct(m.graves)}</td>
                         <td className="num">{pct(m.esp)}</td>
+                        <td className="num">{num(m.exames)}</td>
                         <td className="num">{m.pend > 0.1 ? <span className="tag tag-warn">{pct(m.pend)}</span> : pct(m.pend)}</td>
                       </tr>
                     ))}
@@ -213,5 +254,23 @@ function Kpi({ titulo, valor, sub, children, hero, alerta }) {
       <strong>{valor}</strong>
       <div className="kpi-foot"><small>{sub}</small>{children}</div>
     </div>
+  )
+}
+
+function ListaDelta({ itens, total, vazio }) {
+  if (!itens.some((i) => i.valor)) return <p className="muted small">{vazio}</p>
+  const max = Math.max(1, ...itens.map((x) => x.valor))
+  return (
+    <ul className="barlist">
+      {itens.map((e) => (
+        <li key={e.nome} title={`${e.nome}: ${e.valor} (${total ? Math.round((e.valor / total) * 100) : 0}% dos atendimentos)`}>
+          <div className="bl-row">
+            <span className="bl-name">{e.nome}</span>
+            <span className="bl-val">{e.valor}<em>{total ? Math.round((e.valor / total) * 100) : 0}%</em> {e.antes >= 5 && <Delta atual={e.valor} anterior={e.antes} tipo="rel" />}</span>
+          </div>
+          <div className="bl-track"><div className="bl-bar" style={{ width: `${(e.valor / max) * 100}%` }} /></div>
+        </li>
+      ))}
+    </ul>
   )
 }

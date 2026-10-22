@@ -425,3 +425,20 @@ svg .pt-avg { fill: var(--navy); stroke: #fff; stroke-width: 2; }
 @media (max-width: 959px) { .span-3 { grid-column: 1 / -1; } }
 .dash-grid > *, .kpis > * { min-width: 0; }
 .chart-box { width: 100%; overflow: hidden; }
+
+/* ---------- Exames / medicações ---------- */
+.mt-xs { margin-top: 8px; }
+.chips-sm { gap: 6px; }
+.chips-sm .chip { min-height: 36px; padding: 0 12px; font-size: 13px; white-space: normal; text-align: left; line-height: 1.2; padding-top: 6px; padding-bottom: 6px; }
+.chip-more { border-style: dashed; color: var(--teal-2); background: var(--teal-soft); border-color: #b9e0dd; }
+.search-sm { margin-bottom: 8px; }
+.search-sm input { min-height: 40px !important; font-size: 15px !important; }
+
+.filters-grid { grid-template-columns: 1fr; }
+@media (min-width: 640px) { .filters-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (min-width: 960px) { .filters-grid { grid-template-columns: repeat(4, 1fr); } }
+@media (min-width: 1100px) { .cols-2-list .barlist { display: grid; grid-template-columns: 1fr 1fr; column-gap: 32px; } }
+.matriz th { white-space: normal; min-width: 64px; }
+.chips .chip { max-width: 100%; }
+.chips-sm .chip { flex: 0 1 auto; }
+.bl-bar { background: var(--teal); }

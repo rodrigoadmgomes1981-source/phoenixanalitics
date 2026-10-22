@@ -9,7 +9,7 @@ import { AtendimentoCard, AtendimentoDetalhe } from '../../components/Atendiment
 import AtendimentoForm from '../../components/AtendimentoForm'
 import Icon from '../../components/Icon'
 
-const FILTRO0 = { busca: '', risco: '', setor: '', desfecho: '', especialidade: '', medico: '' }
+const FILTRO0 = { busca: '', risco: '', setor: '', desfecho: '', especialidade: '', exame: '', medicacao: '', medico: '' }
 
 export default function Registros() {
   const { ativos, corRisco, toast, config } = useApp()
@@ -30,11 +30,13 @@ export default function Registros() {
   const filtrados = useMemo(() => {
     const q = f.busca.trim().toLowerCase()
     return (lista || []).filter((a) =>
-      (!q || [a.prontuario, a.iniciais, a.cid, a.exames, a.medicacoes, a.observacoes].some((v) => v && v.toLowerCase().includes(q))) &&
+      (!q || [a.prontuario, a.iniciais, a.cid, a.exames, a.medicacoes, a.observacoes, ...(a.exames_grupos || []), ...(a.medicacoes_classes || [])].some((v) => v && v.toLowerCase().includes(q))) &&
       (!f.risco || a.risco === f.risco) &&
       (!f.setor || a.setor === f.setor) &&
       (!f.desfecho || (f.desfecho === '__pend' ? !a.desfecho : a.desfecho === f.desfecho)) &&
       (!f.especialidade || (f.especialidade === '__nenhum' ? !a.especialidades?.length : a.especialidades?.includes(f.especialidade))) &&
+      (!f.exame || (f.exame === '__nenhum' ? !a.exames_grupos?.length : a.exames_grupos?.includes(f.exame))) &&
+      (!f.medicacao || (f.medicacao === '__nenhum' ? !a.medicacoes_classes?.length : a.medicacoes_classes?.includes(f.medicacao))) &&
       (!f.medico || a.medico_nome === f.medico))
   }, [lista, f])
   const nFiltros = Object.entries(f).filter(([k, v]) => k !== 'busca' && v).length
@@ -55,6 +57,8 @@ export default function Registros() {
       {sel('risco', 'Classificação de risco', 'risco')}
       {sel('setor', 'Setor', 'setor')}
       {sel('especialidade', 'Apoio de especialista', 'especialidade', <option value="__nenhum">Sem apoio</option>)}
+      {sel('exame', 'Exames (família)', 'exame', <option value="__nenhum">Sem exames</option>)}
+      {sel('medicacao', 'Medicação (classe)', 'medicacao', <option value="__nenhum">Sem medicação</option>)}
       {sel('desfecho', 'Desfecho', 'desfecho', <option value="__pend">Pendente</option>)}
       {sel('medico', 'Médico')}
     </div>
@@ -94,7 +98,7 @@ export default function Registros() {
           <div className="table-wrap hide-mobile">
             <table className="table">
               <thead><tr>
-                <th>Data</th><th>Prontuário</th><th>Iniciais</th><th>Risco</th><th>Setor</th><th>Especialista</th><th>CID</th><th>Desfecho</th><th>Médico</th>
+                <th>Data</th><th>Prontuário</th><th>Iniciais</th><th>Risco</th><th>Setor</th><th>Especialista</th><th>Exames</th><th>CID</th><th>Desfecho</th><th>Médico</th>
               </tr></thead>
               <tbody>
                 {filtrados.map((a) => (
@@ -105,6 +109,7 @@ export default function Registros() {
                     <td><RiscoTag nome={a.risco} cor={corRisco(a.risco)} compact /></td>
                     <td>{a.setor}</td>
                     <td>{(a.especialidades || []).join(', ') || <span className="muted">—</span>}</td>
+                    <td>{(a.exames_grupos || []).join(', ') || <span className="muted">—</span>}</td>
                     <td className="mono">{a.cid}</td>
                     <td>{a.desfecho || <span className="tag tag-warn">Pendente</span>}</td>
                     <td>{nomeCurto(a.medico_nome)}</td>

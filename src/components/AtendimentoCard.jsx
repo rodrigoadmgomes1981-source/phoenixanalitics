@@ -22,6 +22,8 @@ export function AtendimentoCard({ a, onOpen, mostrarMedico, mostrarData }) {
           {a.setor && <span className="tag">{a.setor}</span>}
           {a.cid && <span className="tag tag-mono">{a.cid}</span>}
           {(a.especialidades || []).map((e) => <span key={e} className="tag tag-teal">{e}</span>)}
+          {(a.exames_grupos || []).map((e) => <span key={'x' + e} className="tag tag-navy">{e}</span>)}
+          {a.medicacoes_classes?.length > 0 && <span className="tag">{a.medicacoes_classes.length} classe{a.medicacoes_classes.length > 1 ? 's' : ''} de medicação</span>}
         </div>
         <div className="atd-foot">
           {a.desfecho
@@ -51,8 +53,8 @@ export function AtendimentoDetalhe({ a, onClose, onEditar, onExcluido }) {
     ['Setor', a.setor],
     ['Apoio de especialista', (a.especialidades || []).join(', ') || 'Nenhum'],
     ['CID', a.cid],
-    ['Exames solicitados', a.exames],
-    ['Medicações', a.medicacoes],
+    ['Exames solicitados', [(a.exames_grupos || []).join(', '), a.exames].filter(Boolean).join(' — ')],
+    ['Medicações', [(a.medicacoes_classes || []).join(', '), a.medicacoes].filter(Boolean).join(' — ')],
     ['Desfecho', a.desfecho || 'Pendente'],
     ['Observações', a.observacoes],
     ['Médico', a.medico_nome],

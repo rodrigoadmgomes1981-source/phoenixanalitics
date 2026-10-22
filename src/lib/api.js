@@ -10,14 +10,15 @@ import { uid, hojeISO, addDias } from './utils'
 
 const CAMPOS_ATD = [
   'prontuario', 'iniciais', 'data_nascimento', 'data_atendimento', 'risco', 'setor',
-  'especialidades', 'cid', 'exames', 'medicacoes', 'desfecho', 'observacoes',
+  'especialidades', 'cid', 'exames_grupos', 'exames', 'medicacoes_classes', 'medicacoes', 'desfecho', 'observacoes',
 ]
+const CAMPOS_LISTA = new Set(['especialidades', 'exames_grupos', 'medicacoes_classes'])
 
 function limparAtendimento(a) {
   const o = {}
   for (const k of CAMPOS_ATD) {
     let v = a[k]
-    if (k === 'especialidades') v = Array.isArray(v) ? v : []
+    if (CAMPOS_LISTA.has(k)) v = Array.isArray(v) ? v : []
     else if (typeof v === 'string') v = v.trim() || null
     else if (v === undefined || v === '') v = null
     o[k] = v
@@ -28,7 +29,7 @@ function limparAtendimento(a) {
 }
 
 /* ----------------------------- MODO DEMO ----------------------------- */
-const DB_KEY = 'phoenix_checklist_demo_v2'
+const DB_KEY = 'phoenix_checklist_demo_v3'
 const SESSAO_KEY = 'phoenix_checklist_demo_sessao'
 
 function seed() {
@@ -52,6 +53,18 @@ function seed() {
   const cids = ['R10.4', 'J18.9', 'N39.0', 'I10', 'K35.8', 'S82.2', 'R51', 'A09', 'I20.0', 'N20.0', 'K80.2', 'O20.0']
   const exames = ['Hemograma, PCR', 'ECG, Troponina', 'TC de crânio', 'RX tórax', 'USG abdome', 'EAS, Urocultura', 'Função renal, eletrólitos']
   const meds = ['Dipirona 1g EV', 'Ondansetrona 8mg EV', 'Ceftriaxona 1g EV', 'Cetoprofeno 100mg EV', 'SF 0,9% 1000ml', 'AAS 300mg VO']
+  const examesG = by('exame'), medsC = by('medicacao')
+  // sorteia de 1 a max itens (sem repetir), com probabilidade "chance" de ter ao menos um
+  const sorteioVarios = (arr, max, chance) => {
+    if (!arr.length || Math.random() > chance) return []
+    const n = 1 + Math.floor(Math.random() * max)
+    const pool = arr.slice(), out = []
+    for (let i = 0; i < n && pool.length; i++) {
+      const j = Math.floor(Math.pow(Math.random(), 1.8) * pool.length)
+      out.push(pool.splice(j, 1)[0])
+    }
+    return arr.filter((x) => out.includes(x))
+  }
   const atendimentos = []
   const hoje = hojeISO()
   const agora = Date.now()
@@ -85,8 +98,10 @@ function seed() {
         setor,
         especialidades: temEsp ? [pick(esp, [0.08, 0.2, 0.1, 0.07, 0.22, 0.12, 0.15, 0.06])] : [],
         cid: pick(cids),
-        exames: pick(exames),
-        medicacoes: pick(meds),
+        exames_grupos: sorteioVarios(examesG, grave ? 3 : 2, grave ? 0.97 : 0.85),
+        exames: Math.random() < 0.5 ? pick(exames) : null,
+        medicacoes_classes: sorteioVarios(medsC.slice(0, grave ? 26 : 12), grave ? 4 : 2, 0.92),
+        medicacoes: Math.random() < 0.4 ? pick(meds) : null,
         desfecho: d === 0 && i > 3 ? null : (d < 3 && Math.random() < 0.06 ? null : desfecho),
         observacoes: null,
         medico_id: med.id,
