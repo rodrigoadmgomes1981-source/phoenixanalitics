@@ -49,8 +49,8 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
       if (!vis(key) || !obr(key)) continue
       const v = f[key]
       const lista = key === 'exames' ? f.exames_grupos : key === 'medicacoes' ? f.medicacoes_classes : null
-      if (lista?.length) continue
-      if (Array.isArray(v) ? v.length === 0 : !String(v ?? '').trim()) e[key] = lista ? 'Selecione ao menos uma opção' : 'Campo obrigatório'
+      if (lista) { if (!lista.length) e[key] = 'Selecione ao menos uma opção'; continue }
+      if (Array.isArray(v) ? v.length === 0 : !String(v ?? '').trim()) e[key] = 'Campo obrigatório'
     }
     if (f.data_nascimento && f.data_atendimento && f.data_nascimento > f.data_atendimento) e.data_nascimento = 'Data posterior ao atendimento'
     if (f.data_atendimento && f.data_atendimento > hojeISO()) e.data_atendimento = 'Data futura não permitida'
@@ -180,7 +180,6 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
                   )
                 })}
               </div>
-              <textarea rows={2} className="mt-xs" value={f.exames} onChange={(e) => set('exames', e.target.value)} placeholder="Detalhar (opcional) — ex.: hemograma, PCR, TC de crânio" />
             </Field>
           )}
           {vis('medicacoes') && (() => {
@@ -213,7 +212,6 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
                   {!q && todasMed && lista.length > LIMITE && <button type="button" className="chip chip-more" onClick={() => setTodasMed(false)}>Mostrar menos</button>}
                   {q && filtrada.length === 0 && <span className="muted small">Nenhuma classe encontrada.</span>}
                 </div>
-                <textarea rows={2} className="mt-xs" value={f.medicacoes} onChange={(e) => set('medicacoes', e.target.value)} placeholder="Detalhar (opcional) — ex.: dipirona 1g EV, ondansetrona 8mg EV" />
               </Field>
             )
           })()}
