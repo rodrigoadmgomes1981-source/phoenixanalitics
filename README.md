@@ -10,6 +10,17 @@ Sistema web responsivo (React + Vite) para o monitoramento diário dos atendimen
 | **Médico** | Registra os atendimentos do plantão (prontuário, iniciais, nascimento, data, classificação de risco, setor, apoio de especialista, CID, exames, medicações, desfecho e observações). Vê o plantão do dia, os desfechos pendentes e o próprio histórico. Edita os próprios registros. |
 | **Administrador** | Painel com indicadores do período (risco, setor, desfecho, especialistas, volume diário, produção por médico e quem já preencheu hoje). Consulta, filtra, edita, exclui e exporta registros (Excel/CSV). Gerencia parâmetros (listas de seleção com cor e ordem, campos visíveis/obrigatórios, dados da unidade) e usuários. |
 
+## Link de visualização (Painel + Analytics)
+
+Em **Compartilhar** (menu lateral ou botão no Painel/Analytics), o admin cria links como `https://seusite.vercel.app/v/<código>`.
+Quem abre vê só o Painel e o Analytics, sem login e sem editar nada. Prontuário, iniciais, data de nascimento e observações
+não saem do banco (a função `view_dados` devolve só a idade e os campos agregáveis). Os links podem ter validade e ser revogados na hora.
+
+## Atualizações de banco (para quem já rodou o schema antes)
+
+1. `supabase/atualizacao-01-exames-medicacoes.sql`
+2. `supabase/atualizacao-02-links-visualizacao.sql`
+
 ## Rodar localmente
 
 ```bash

@@ -59,6 +59,7 @@ export default function Login({ onLogin }) {
             </div>
           </div>
         )}
+        <img src="/logo-camboriu.png" alt="Prefeitura de Camboriú" className="login-pref" />
         <p className="login-foot">Uso restrito. Dados de saúde protegidos pela LGPD — registre apenas iniciais do paciente.</p>
       </main>
     </div>

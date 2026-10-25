@@ -442,3 +442,39 @@ svg .pt-avg { fill: var(--navy); stroke: #fff; stroke-width: 2; }
 .chips .chip { max-width: 100%; }
 .chips-sm .chip { flex: 0 1 auto; }
 .bl-bar { background: var(--teal); }
+
+/* ---------- Co-branding Prefeitura de Camboriú ---------- */
+.login-pref { width: 170px; align-self: center; margin-top: -4px; }
+.sidenav-brand { gap: 10px; }
+.sidenav-brand .sidenav-pref { width: 150px; padding-top: 10px; border-top: 1px solid var(--line-2); }
+.cobrand { display: none; }
+.perfil-logos { display: flex; align-items: center; gap: 18px; margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line-2); }
+.perfil-logos img:first-child { height: 56px; }
+.perfil-logos img:last-child { height: 50px; }
+.icon-btn-light { color: #fff; }
+.icon-btn-light:hover { background: rgba(255,255,255,.12) !important; }
+.sidenav-viewer { margin-top: 18px; padding: 14px; border-radius: 14px; background: rgba(255,255,255,.07); display: grid; gap: 6px; color: #d6e6f4; font-size: 13px; }
+.sidenav-viewer span { display: flex; align-items: center; gap: 8px; font-weight: 700; color: #fff; }
+.sidenav-viewer small { color: #9fb6cc; margin-bottom: 4px; }
+/* modo visualização: logos lado a lado no topo (celular) e sem barra inferior */
+.viewer .cobrand { display: flex; align-items: center; justify-content: center; gap: 16px; background: #fff; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+.viewer .cobrand img:first-child { height: 46px; }
+.viewer .cobrand img:last-child { height: 40px; }
+.cobrand-sep { width: 1px; height: 34px; background: var(--line); }
+@media (min-width: 960px) { .viewer .cobrand { display: none; } }
+
+/* ---------- Links de visualização ---------- */
+.links-intro { display: flex; justify-content: space-between; align-items: flex-start; gap: 14px; flex-wrap: wrap; }
+.links-intro > div { flex: 1; min-width: 240px; }
+.warn-txt { color: var(--warn); font-weight: 600; }
+.link-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.link-item { display: grid; gap: 8px; }
+.link-off { opacity: .7; }
+.link-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.link-url { display: block; font: 12.5px/1.4 ui-monospace, Menlo, monospace; background: #f4f7fa; border: 1px solid var(--line-2); border-radius: 8px; padding: 8px 10px; word-break: break-all; color: var(--ink-2); }
+.link-url-lg { font-size: 14px; padding: 12px; }
+.link-acts { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+.link-acts .btn { min-height: 38px; padding: 0 12px; font-size: 14px; }
+.link-acts .grow { flex: 1; }
+.btn.disabled { opacity: .45; pointer-events: none; }
+a.btn { text-decoration: none; }

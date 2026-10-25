@@ -35,6 +35,10 @@ export default function Perfil() {
         <h2 className="card-title"><Icon name="hospital" size={18} />Unidade</h2>
         <p><strong>{config.hospital}</strong></p>
         <p className="muted">{config.empresa}</p>
+        <div className="perfil-logos">
+          <img src="/logo-full.png" alt="Phoenix Serviços Médicos" />
+          <img src="/logo-camboriu.png" alt="Prefeitura de Camboriú" />
+        </div>
       </div>
 
       <form className="card stack" onSubmit={trocar}>

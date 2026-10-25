@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../../context'
 import { api } from '../../lib/api'
-import { contar, fmtData, idade, nomeCurto } from '../../lib/utils'
+import { contar, fmtData, idadeAtd, nomeCurto } from '../../lib/utils'
 import {
   FAIXAS, diasEntre, ehGrave, matriz, mixPorSemana,
   periodoAnterior, porDiaSemana, resumo, serieDiaria,
@@ -15,8 +15,8 @@ import Icon from '../../components/Icon'
 const pct = (v, d = 0) => (v == null ? '—' : `${(v * 100).toFixed(d).replace('.', ',')}%`)
 const num = (v, d = 1) => (v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: d }))
 
-export default function Analytics() {
-  const { ativos, toast } = useApp()
+export default function Analytics({ ir }) {
+  const { ativos, toast, profile } = useApp()
   const [periodo, setPeriodo] = useState({ tipo: '30' })
   const [bruto, setBruto] = useState(null)
   const iv = intervalo(periodo)
@@ -59,7 +59,7 @@ export default function Analytics() {
       return { ...rk, total: l.length, celulas: examesP.map((e) => ({ nome: e.nome, valor: l.filter((a) => a.exames_grupos?.includes(e.nome)).length })) }
     })
     const cids = [...contar(atual, (a) => a.cid).entries()].sort((a, b) => b[1] - a[1]).slice(0, 8).map(([nome, valor]) => ({ nome, valor }))
-    const idades = atual.map((a) => idade(a.data_nascimento, a.data_atendimento))
+    const idades = atual.map(idadeAtd)
     const faixas = FAIXAS.map(([nome, lo, hi]) => ({ nome, valor: idades.filter((x) => x != null && x >= lo && x <= hi).length }))
     const semIdade = idades.filter((x) => x == null).length
 
@@ -122,6 +122,7 @@ export default function Analytics() {
           <h1 className="page-title">Analytics estratégico</h1>
           <p className="muted small">{fmtData(iv.de)} a {fmtData(iv.ate)} ({n} dias) · comparado a {fmtData(ant.de)} a {fmtData(ant.ate)}</p>
         </div>
+        {profile.role === 'admin' && <button className="btn btn-ghost" onClick={() => ir('links')}><Icon name="share" size={18} />Compartilhar</button>}
       </div>
       <Periodo value={periodo} onChange={setPeriodo} />
 

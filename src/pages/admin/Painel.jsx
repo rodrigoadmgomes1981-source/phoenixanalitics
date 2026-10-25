@@ -9,7 +9,7 @@ import { ehGrave } from '../../lib/indicadores'
 import Icon from '../../components/Icon'
 
 export default function Painel({ ir }) {
-  const { ativos, toast } = useApp()
+  const { ativos, toast, profile } = useApp()
   const [periodo, setPeriodo] = useState({ tipo: '7' })
   const [lista, setLista] = useState(null)
   const [hoje, setHoje] = useState([])
@@ -63,7 +63,10 @@ export default function Painel({ ir }) {
           <h1 className="page-title">Painel de monitoramento</h1>
           <p className="muted">{iv.de === iv.ate ? fmtData(iv.de) : `${fmtData(iv.de)} a ${fmtData(iv.ate)}`}</p>
         </div>
-        <button className="btn btn-soft" onClick={() => ir('analytics')}><Icon name="trend" size={18} />Analytics</button>
+        <div className="row-gap">
+          <button className="btn btn-soft" onClick={() => ir('analytics')}><Icon name="trend" size={18} />Analytics</button>
+          {profile.role === 'admin' && <button className="btn btn-ghost" onClick={() => ir('links')}><Icon name="share" size={18} />Compartilhar</button>}
+        </div>
       </div>
       <Periodo value={periodo} onChange={setPeriodo} />
 

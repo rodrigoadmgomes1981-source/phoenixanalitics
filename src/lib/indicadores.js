@@ -1,4 +1,4 @@
-import { addDias, contar, idade } from './utils'
+import { addDias, contar, idadeAtd } from './utils'
 
 // Regras de agrupamento usadas nos indicadores estratégicos
 export const ehGrave = (riscosAtivos) => {
@@ -26,7 +26,7 @@ const taxa = (n, t) => (t ? n / t : null)
 export function resumo(lista, de, ate, riscos) {
   const t = lista.length
   const grave = ehGrave(riscos)
-  const idades = lista.map((a) => idade(a.data_nascimento, a.data_atendimento)).filter((x) => x != null)
+  const idades = lista.map(idadeAtd).filter((x) => x != null)
   const comDesf = lista.filter((a) => a.desfecho)
   return {
     total: t,

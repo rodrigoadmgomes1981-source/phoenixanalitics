@@ -28,6 +28,28 @@ function limparAtendimento(a) {
   return o
 }
 
+/* ---------------------- Links de visualização ---------------------- */
+export function novoToken() {
+  const b = new Uint8Array(24)
+  crypto.getRandomValues(b)
+  return btoa(String.fromCharCode(...b)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '')
+}
+const expiraEm = (dias) => (dias ? new Date(Date.now() + dias * 86400000).toISOString() : null)
+const idadeEm = (nasc, ref) => {
+  if (!nasc) return null
+  const n = new Date(nasc + 'T12:00:00'), d = new Date(ref + 'T12:00:00')
+  let x = d.getFullYear() - n.getFullYear()
+  if (d.getMonth() < n.getMonth() || (d.getMonth() === n.getMonth() && d.getDate() < n.getDate())) x--
+  return x
+}
+// Só os campos necessários para Painel e Analytics — sem prontuário, iniciais, nascimento ou observações
+const anonimizar = (a) => ({
+  id: a.id, data_atendimento: a.data_atendimento, risco: a.risco, setor: a.setor,
+  especialidades: a.especialidades || [], exames_grupos: a.exames_grupos || [], medicacoes_classes: a.medicacoes_classes || [],
+  cid: a.cid, desfecho: a.desfecho, idade: idadeEm(a.data_nascimento, a.data_atendimento),
+  medico_id: a.medico_id, medico_nome: a.medico_nome, created_at: a.created_at,
+})
+
 /* ----------------------------- MODO DEMO ----------------------------- */
 const DB_KEY = 'phoenix_checklist_demo_v4'
 const SESSAO_KEY = 'phoenix_checklist_demo_sessao'
@@ -204,6 +226,27 @@ const demo = {
   },
   async resetSenha(id, senha) { return demo.updateUsuario(id, { senha }) },
   async resetDemo() { try { localStorage.removeItem(DB_KEY); localStorage.removeItem(SESSAO_KEY) } catch { /* ignora */ } },
+
+  async listLinks() { return espera((lerDB().links || []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))) },
+  async createLink({ nome, dias }) {
+    const db = lerDB(); db.links = db.links || []
+    const l = { id: uid(), token: novoToken(), nome, ativo: true, expires_at: expiraEm(dias), created_at: new Date().toISOString(), ultimo_acesso: null }
+    db.links.push(l); salvarDB(db); return l
+  },
+  async updateLink(id, patch) { const db = lerDB(); Object.assign(db.links.find((l) => l.id === id), patch); salvarDB(db) },
+  async deleteLink(id) { const db = lerDB(); db.links = db.links.filter((l) => l.id !== id); salvarDB(db) },
+  async viewDados(token, de, ate) {
+    const db = lerDB()
+    const l = (db.links || []).find((x) => x.token === token && x.ativo && (!x.expires_at || x.expires_at > new Date().toISOString()))
+    if (!l) throw new Error('link_invalido')
+    l.ultimo_acesso = new Date().toISOString(); salvarDB(db)
+    return {
+      link: { nome: l.nome, expires_at: l.expires_at },
+      config: db.config, parametros: db.parametros,
+      medicos: db.users.filter((u) => u.role === 'medico' && u.ativo).map(({ id, nome, role, ativo }) => ({ id, nome, role, ativo })),
+      atendimentos: db.atendimentos.filter((a) => a.data_atendimento >= de && a.data_atendimento <= ate).map(anonimizar),
+    }
+  },
 }
 
 /* ------------------------------ SUPABASE ------------------------------ */
@@ -291,7 +334,56 @@ const sb = {
   async updateUsuario(id, patch) { ok(await supabase.from('profiles').update(patch).eq('id', id)) },
   async resetSenha(id, senha) { return chamarApiUsuarios('PATCH', { id, senha }) },
   async resetDemo() {},
+
+  async listLinks() { return ok(await supabase.from('view_links').select('*').order('created_at', { ascending: false })) },
+  async createLink({ nome, dias }) {
+    return ok(await supabase.from('view_links').insert({ nome, token: novoToken(), expires_at: expiraEm(dias) }).select().single())
+  },
+  async updateLink(id, patch) { ok(await supabase.from('view_links').update(patch).eq('id', id)) },
+  async deleteLink(id) { ok(await supabase.from('view_links').delete().eq('id', id)) },
+  async viewDados(token, de, ate) {
+    const { data, error } = await supabase.rpc('view_dados', { p_token: token, p_de: de, p_ate: ate })
+    if (error) throw new Error(/link_invalido/.test(error.message) ? 'link_invalido' : traduzErro(error))
+    return data
+  },
 }
 
-export const api = DEMO ? demo : sb
+const base = DEMO ? demo : sb
+let impl = base
+
+/** Modo somente leitura acessado por link: expõe apenas o necessário para Painel e Analytics. */
+function criarVisualizador(token) {
+  const cache = new Map()
+  let meta = null
+  const buscar = (de, ate) => {
+    const k = de + '|' + ate
+    if (!cache.has(k)) cache.set(k, base.viewDados(token, de, ate).catch((e) => { cache.delete(k); throw e }))
+    return cache.get(k)
+  }
+  const negar = async () => { throw new Error('Somente visualização.') }
+  return {
+    async init() { meta = await buscar(hojeISO(), hojeISO()); return meta.link },
+    limparCache() { cache.clear() },
+    async currentProfile() { return null },
+    async listParametros() { return (meta?.parametros || []).slice().sort((a, b) => a.ordem - b.ordem) },
+    async getConfig() { return mergeConfig(meta?.config) },
+    async listAtendimentos({ de, ate } = {}) {
+      const a = ate || hojeISO()
+      const d = de || addDias(a, -365)
+      const r = await buscar(d, a)
+      return r.atendimentos.slice().sort((x, y) => (y.data_atendimento + y.created_at).localeCompare(x.data_atendimento + x.created_at))
+    },
+    async listUsuarios() { return meta?.medicos || [] },
+    saveAtendimento: negar, deleteAtendimento: negar, saveParametro: negar, saveConfig: negar,
+    createUsuario: negar, updateUsuario: negar, listLinks: negar, createLink: negar,
+  }
+}
+
+export function usarVisualizacao(token) {
+  impl = criarVisualizador(token)
+  return impl
+}
+
+// Proxy: as telas importam "api" normalmente; no link de visualização a implementação é trocada.
+export const api = new Proxy({}, { get: (_, k) => impl[k] })
 export { DEMO }
