@@ -50,3 +50,6 @@ on conflict (tipo, nome) do nothing;
 
 -- Conferência: deve mostrar exame = 5 e medicacao = 26
 select tipo, count(*) from public.parametros group by tipo order by tipo;
+
+-- Faz a API do Supabase enxergar as mudanças na hora
+notify pgrst, 'reload schema';

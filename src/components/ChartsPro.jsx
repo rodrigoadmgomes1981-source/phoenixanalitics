@@ -46,7 +46,7 @@ export function LinhaTendencia({ dados }) {
   return (
     <div ref={ref} className="chart-box">
       <div className="legend">
-        <span><i className="lg-line" />Atendimentos/dia</span>
+        <span><i className="lg-line" />Entradas/dia</span>
         <span><i className="lg-dash" />Média móvel 7 dias</span>
       </div>
       <svg width={W} height={H} onMouseMove={mover} onTouchMove={mover} onMouseLeave={() => setHover(null)} role="img" aria-label="Tendência de atendimentos por dia">
@@ -72,7 +72,7 @@ export function LinhaTendencia({ dados }) {
       {h && (
         <div className="tip" style={{ left: Math.min(Math.max(x(hover), 70), W - 70) }}>
           <strong>{fmtData(h.x, { weekday: 'short', day: '2-digit', month: '2-digit' })}</strong>
-          <span>{h.y} atendimento(s)</span>
+          <span>{h.y} entrada(s)</span>
           {h.mm != null && <span className="muted">Média 7d: {fmtN(h.mm)}</span>}
         </div>
       )}

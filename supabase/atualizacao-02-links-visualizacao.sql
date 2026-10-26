@@ -84,3 +84,6 @@ grant execute on function public.view_dados(text, date, date) to anon, authentic
 select 'view_links' as objeto, count(*) from public.view_links
 union all
 select 'view_dados', count(*) from pg_proc where proname = 'view_dados';
+
+-- Faz a API do Supabase enxergar as mudanças na hora
+notify pgrst, 'reload schema';

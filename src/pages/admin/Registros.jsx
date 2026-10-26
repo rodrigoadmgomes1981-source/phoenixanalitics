@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useApp } from '../../context'
 import { api } from '../../lib/api'
-import { fmtData, fmtHora, nomeCurto } from '../../lib/utils'
+import { fmtData, fmtHora, nomeCurto, diasPermanencia } from '../../lib/utils'
 import { exportarCSV, exportarXLSX } from '../../lib/exportar'
 import Periodo, { intervalo } from '../../components/Periodo'
 import { Empty, RiscoTag, Sheet, Spinner } from '../../components/ui'
@@ -22,7 +22,7 @@ export default function Registros() {
   const iv = intervalo(periodo)
 
   const carregar = useCallback(async () => {
-    try { setLista(await api.listAtendimentos({ de: iv.de, ate: iv.ate })) } catch (e) { toast(e.message, 'erro'); setLista([]) }
+    try { setLista(await api.listAtendimentos({ de: iv.de, ate: iv.ate, sobrepor: true })) } catch (e) { toast(e.message, 'erro'); setLista([]) }
   }, [iv.de, iv.ate, toast])
   useEffect(() => { setLista(null); carregar() }, [carregar])
 
@@ -59,7 +59,7 @@ export default function Registros() {
       {sel('especialidade', 'Apoio de especialista', 'especialidade', <option value="__nenhum">Sem apoio</option>)}
       {sel('exame', 'Exames (família)', 'exame', <option value="__nenhum">Sem exames</option>)}
       {sel('medicacao', 'Medicação (classe)', 'medicacao', <option value="__nenhum">Sem medicação</option>)}
-      {sel('desfecho', 'Desfecho', 'desfecho', <option value="__pend">Pendente</option>)}
+      {sel('desfecho', 'Situação / desfecho', 'desfecho', <option value="__pend">Internados (sem alta)</option>)}
       {sel('medico', 'Médico')}
     </div>
   )
@@ -98,7 +98,7 @@ export default function Registros() {
           <div className="table-wrap hide-mobile">
             <table className="table">
               <thead><tr>
-                <th>Data</th><th>Prontuário</th><th>Iniciais</th><th>Risco</th><th>Setor</th><th>Especialista</th><th>Exames</th><th>CID</th><th>Desfecho</th><th>Médico</th>
+                <th>Internação</th><th>Prontuário</th><th>Iniciais</th><th>Risco</th><th>Setor</th><th>Especialista</th><th>Exames</th><th>CID</th><th>Situação</th><th>Médico</th>
               </tr></thead>
               <tbody>
                 {filtrados.map((a) => (
@@ -111,7 +111,9 @@ export default function Registros() {
                     <td>{(a.especialidades || []).join(', ') || <span className="muted">—</span>}</td>
                     <td>{(a.exames_grupos || []).join(', ') || <span className="muted">—</span>}</td>
                     <td className="mono">{a.cid}</td>
-                    <td>{a.desfecho || <span className="tag tag-warn">Pendente</span>}</td>
+                    <td>{a.desfecho
+                      ? <>{a.desfecho}<small className="muted"> · {fmtData(a.data_desfecho, { day: '2-digit', month: '2-digit' })} ({diasPermanencia(a)}d)</small></>
+                      : <span className="tag tag-teal"><span className="pulse" />Internado · {diasPermanencia(a)}d</span>}</td>
                     <td>{nomeCurto(a.medico_nome)}</td>
                   </tr>
                 ))}
@@ -130,7 +132,7 @@ export default function Registros() {
       </Sheet>
       <AtendimentoForm open={form.open} inicial={form.inicial} onClose={() => setForm({ open: false, inicial: null })} onSaved={carregar} />
       <AtendimentoDetalhe a={det} onClose={() => setDet(null)}
-        onEditar={(a) => { setDet(null); setForm({ open: true, inicial: a }) }} onExcluido={() => { setDet(null); carregar() }} />
+        onEditar={(a) => { setDet(null); setForm({ open: true, inicial: a }) }} onExcluido={() => { setDet(null); carregar() }} onAlterado={() => { setDet(null); carregar() }} />
     </div>
   )
 }

@@ -69,14 +69,14 @@ export const CAMPOS = [
   { key: 'prontuario', label: 'Prontuário' },
   { key: 'iniciais', label: 'Iniciais do paciente' },
   { key: 'data_nascimento', label: 'Data de nascimento' },
-  { key: 'data_atendimento', label: 'Data do atendimento', fixo: true },
+  { key: 'data_atendimento', label: 'Data de internação', fixo: true },
   { key: 'risco', label: 'Classificação de risco' },
   { key: 'setor', label: 'Setor' },
   { key: 'especialidades', label: 'Apoio de especialista' },
   { key: 'cid', label: 'CID do paciente' },
   { key: 'exames', label: 'Exames solicitados' },
   { key: 'medicacoes', label: 'Medicações' },
-  { key: 'desfecho', label: 'Desfecho' },
+  { key: 'desfecho', label: 'Desfecho', semObrigatorio: true },
   { key: 'observacoes', label: 'Observações' },
 ]
 

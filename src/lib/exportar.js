@@ -1,19 +1,23 @@
-import { fmtData, fmtHora } from './utils'
+import { diasPermanencia, fmtData, fmtHora } from './utils'
 
 const COLUNAS = [
   ['Prontuário', (a) => a.prontuario],
   ['Iniciais do paciente', (a) => a.iniciais],
   ['Data de nascimento', (a) => fmtDataOuVazio(a.data_nascimento)],
-  ['Data do atendimento', (a) => fmtDataOuVazio(a.data_atendimento)],
+  ['Data de internação', (a) => fmtDataOuVazio(a.data_atendimento)],
   ['Classificação de risco', (a) => a.risco],
   ['Setor', (a) => a.setor],
   ['Apoio de especialista', (a) => (a.especialidades || []).join('; ')],
   ['CID do paciente', (a) => a.cid],
   ['Exames solicitados', (a) => (a.exames_grupos || []).join('; ')],
   ['Medicações (classes)', (a) => (a.medicacoes_classes || []).join('; ')],
+  ['Situação', (a) => (a.desfecho ? 'Alta' : 'Internado')],
   ['Desfecho', (a) => a.desfecho],
+  ['Data da alta', (a) => fmtDataOuVazio(a.data_desfecho)],
+  ['Permanência (dias)', (a) => diasPermanencia(a)],
+  ['Alta registrada por', (a) => a.alta_por_nome],
   ['Observações', (a) => a.observacoes],
-  ['Médico', (a) => a.medico_nome],
+  ['Incluído por', (a) => a.medico_nome],
   ['Registrado em', (a) => `${fmtData(a.created_at)} ${fmtHora(a.created_at)}`],
 ]
 const fmtDataOuVazio = (v) => (v ? fmtData(v) : '')

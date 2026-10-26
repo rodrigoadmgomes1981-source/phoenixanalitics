@@ -1,60 +1,66 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../../context'
 import { api } from '../../lib/api'
-import { addDias, contar, hojeISO, fmtData, nomeCurto } from '../../lib/utils'
+import { contar, hojeISO, fmtData, nomeCurto } from '../../lib/utils'
 import Periodo, { intervalo } from '../../components/Periodo'
 import { BarList, Colunas } from '../../components/Charts'
 import { Spinner } from '../../components/ui'
-import { ehGrave } from '../../lib/indicadores'
+import { censoDiario, diasInternado, ehGrave, permanencia } from '../../lib/indicadores'
 import Icon from '../../components/Icon'
+
+const num = (v) => (v == null ? '—' : v.toLocaleString('pt-BR', { maximumFractionDigits: 1 }))
 
 export default function Painel({ ir }) {
   const { ativos, toast, profile } = useApp()
   const [periodo, setPeriodo] = useState({ tipo: '7' })
   const [lista, setLista] = useState(null)
-  const [hoje, setHoje] = useState([])
-  const [medicos, setMedicos] = useState([])
+  const [internados, setInternados] = useState(null)
   const iv = intervalo(periodo)
 
   useEffect(() => {
     setLista(null)
-    api.listAtendimentos({ de: iv.de, ate: iv.ate }).then(setLista).catch((e) => { toast(e.message, 'erro'); setLista([]) })
+    // sobrepor: quem esteve internado em algum dia do período (inclui quem entrou antes)
+    api.listAtendimentos({ de: iv.de, ate: iv.ate, sobrepor: true }).then(setLista).catch((e) => { toast(e.message, 'erro'); setLista([]) })
   }, [iv.de, iv.ate, toast])
 
   useEffect(() => {
-    api.listAtendimentos({ de: hojeISO(), ate: hojeISO() }).then(setHoje).catch(() => {})
-    api.listUsuarios().then((u) => setMedicos(u.filter((x) => x.role === 'medico' && x.ativo))).catch(() => {})
+    api.listAtendimentos({ ativos: true }).then(setInternados).catch(() => setInternados([]))
   }, [])
 
   const d = useMemo(() => {
     if (!lista) return null
-    const total = lista.length
-    const dist = (tipo, fn) => {
-      const c = contar(lista, fn)
-      const base = ativos(tipo).map((p) => ({ nome: p.nome, cor: p.cor, valor: c.get(p.nome) || 0 }))
-      const extras = [...c.entries()].filter(([k]) => !base.some((b) => b.nome === k)).map(([nome, valor]) => ({ nome, valor }))
-      return [...base, ...extras]
+    const entradas = lista.filter((a) => a.data_atendimento >= iv.de && a.data_atendimento <= iv.ate)
+    const total = entradas.length
+    const dist = (tipo, fn, base = entradas) => {
+      const c = contar(base, fn)
+      const b = ativos(tipo).map((p) => ({ nome: p.nome, cor: p.cor, valor: c.get(p.nome) || 0 }))
+      const extras = [...c.entries()].filter(([k]) => !b.some((x) => x.nome === k)).map(([nome, valor]) => ({ nome, valor }))
+      return [...b, ...extras]
     }
-    const dias = []
-    for (let x = iv.de; x <= iv.ate; x = addDias(x, 1)) dias.push({ dia: x, valor: 0 })
-    const cDia = contar(lista, (a) => a.data_atendimento)
-    dias.forEach((x) => { x.valor = cDia.get(x.dia) || 0 })
-    const porMed = [...contar(lista, (a) => a.medico_nome).entries()].map(([nome, valor]) => ({ nome: nomeCurto(nome), valor })).sort((a, b) => b.valor - a.valor)
-    const semDesf = lista.filter((a) => !a.desfecho).length
-    const comEsp = lista.filter((a) => a.especialidades?.length).length
-    const graves = lista.filter(ehGrave(ativos('risco'))).length
+    const saidas = lista.filter((a) => a.data_desfecho && a.data_desfecho >= iv.de && a.data_desfecho <= iv.ate)
+    const porMed = [...contar(entradas, (a) => a.medico_nome).entries()].map(([nome, valor]) => ({ nome: nomeCurto(nome), valor })).sort((a, b) => b.valor - a.valor)
     return {
-      total, dias, semDesf, comEsp, graves, porMed,
-      media: dias.length ? (total / dias.length) : 0,
+      total, saidas,
+      perm: permanencia(lista, iv.de, iv.ate),
+      censo: censoDiario(lista, iv.de, iv.ate),
+      graves: entradas.filter(ehGrave(ativos('risco'))).length,
+      porMed,
       risco: dist('risco', (a) => a.risco),
       setor: dist('setor', (a) => a.setor),
-      desfecho: dist('desfecho', (a) => a.desfecho),
+      desfecho: dist('desfecho', (a) => a.desfecho, saidas),
       esp: dist('especialidade', (a) => a.especialidades).sort((a, b) => b.valor - a.valor),
     }
   }, [lista, ativos, iv.de, iv.ate])
 
+  const agora = useMemo(() => {
+    if (!internados) return null
+    const hoje = hojeISO()
+    const comDias = internados.map((a) => ({ ...a, dias: diasInternado(a, hoje) })).sort((a, b) => b.dias - a.dias)
+    const porSetor = [...contar(internados, (a) => a.setor || 'Sem setor').entries()].map(([nome, valor]) => ({ nome, valor }))
+    return { total: internados.length, porSetor, longos: comDias.slice(0, 5), risco: dist2(ativos('risco'), internados) }
+  }, [internados, ativos])
+
   const pct = (n) => (d?.total ? Math.round((n / d.total) * 100) + '%' : '—')
-  const contHoje = contar(hoje, (a) => a.medico_id)
 
   return (
     <div className="page page-wide">
@@ -73,44 +79,52 @@ export default function Painel({ ir }) {
       {!d ? <Spinner /> : (
         <>
           <div className="kpis">
-            <div className="kpi kpi-hero"><span>Atendimentos</span><strong>{d.total}</strong><small>{d.media.toFixed(1).replace('.', ',')} por dia</small></div>
-            <div className="kpi"><span>Vermelho + Laranja</span><strong>{d.graves}</strong><small>{pct(d.graves)} do total</small></div>
-            <div className="kpi"><span>Apoio de especialista</span><strong>{d.comEsp}</strong><small>{pct(d.comEsp)} do total</small></div>
-            <div className={'kpi' + (d.semDesf ? ' kpi-warn' : '')}><span>Desfecho pendente</span><strong>{d.semDesf}</strong><small>{pct(d.semDesf)} do total</small></div>
+            <div className="kpi kpi-hero"><span>Internados agora</span><strong>{agora ? agora.total : '–'}</strong><small>{agora?.porSetor.map((s) => `${s.valor} ${s.nome.toLowerCase()}`).join(' · ') || 'nenhum'}</small></div>
+            <div className="kpi"><span>Entradas no período</span><strong>{d.total}</strong><small>{d.graves} Vermelho/Laranja ({pct(d.graves)})</small></div>
+            <div className="kpi"><span>Altas no período</span><strong>{d.saidas.length}</strong><small>com desfecho registrado</small></div>
+            <div className="kpi"><span>Permanência média</span><strong>{d.perm.media == null ? '—' : `${num(d.perm.media)} d`}</strong><small>{d.perm.longas ? `${d.perm.longas} alta(s) após 7+ dias` : 'das altas do período'}</small></div>
           </div>
 
           <div className="dash-grid">
             <section className="card span-2">
-              <h2 className="card-title">Atendimentos por dia</h2>
-              {d.dias.length > 1 ? <Colunas dias={d.dias} /> : <p className="muted small">Selecione um período com mais de um dia para ver a evolução.</p>}
+              <h2 className="card-title">Ocupação diária</h2>
+              <p className="muted small mb-s">Pacientes internados ao fim de cada dia</p>
+              {d.censo.length > 1 ? <Colunas dias={d.censo} /> : <p className="muted small">Selecione um período com mais de um dia para ver a evolução.</p>}
             </section>
 
             <section className="card">
-              <h2 className="card-title">Preenchimento de hoje</h2>
-              {medicos.length === 0 ? <p className="muted small">Nenhum médico ativo cadastrado.</p> : (
-                <ul className="fill-list">
-                  {medicos.map((m) => {
-                    const n = contHoje.get(m.id) || 0
-                    return (
-                      <li key={m.id}>
-                        <span className={'dot ' + (n ? 'dot-ok' : 'dot-off')} aria-hidden="true" />
-                        <span className="fill-name">{m.nome}</span>
-                        <span className={'tag ' + (n ? 'tag-teal' : 'tag-muted')}>{n ? `${n} registro${n > 1 ? 's' : ''}` : 'Sem registro'}</span>
-                      </li>
-                    )
-                  })}
-                </ul>
+              <h2 className="card-title">Internados agora</h2>
+              {!agora ? <Spinner /> : agora.total === 0 ? <p className="muted small">Nenhum paciente internado.</p> : (
+                <>
+                  <BarList itens={agora.risco.filter((r) => r.valor)} total={agora.total} />
+                  <div className="longos">
+                    <strong className="small">Maiores permanências</strong>
+                    <ul>
+                      {agora.longos.map((a) => (
+                        <li key={a.id}>
+                          <span>{a.iniciais || a.cid || 'Paciente'} · {a.setor || '—'}</span>
+                          <b className={a.dias >= 7 ? '' : 'ok'}>{a.dias === 0 ? 'hoje' : `${a.dias} d`}</b>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                </>
               )}
             </section>
 
-            <section className="card"><h2 className="card-title">Classificação de risco</h2><BarList itens={d.risco} total={d.total} /></section>
-            <section className="card"><h2 className="card-title">Desfecho</h2><BarList itens={d.desfecho} total={d.total} /></section>
-            <section className="card"><h2 className="card-title">Setor</h2><BarList itens={d.setor} total={d.total} /></section>
+            <section className="card"><h2 className="card-title">Entradas por classificação de risco</h2><BarList itens={d.risco} total={d.total} /></section>
+            <section className="card"><h2 className="card-title">Desfecho das altas</h2><BarList itens={d.desfecho} total={d.saidas.length} vazio="Nenhuma alta no período" /></section>
+            <section className="card"><h2 className="card-title">Entradas por setor</h2><BarList itens={d.setor} total={d.total} /></section>
             <section className="card"><h2 className="card-title">Apoio de especialista</h2><BarList itens={d.esp} /></section>
-            <section className="card"><h2 className="card-title">Atendimentos por médico</h2><BarList itens={d.porMed} total={d.total} /></section>
+            <section className="card"><h2 className="card-title">Inclusões por médico</h2><BarList itens={d.porMed} total={d.total} /></section>
           </div>
         </>
       )}
     </div>
   )
+}
+
+function dist2(params, lista) {
+  const c = contar(lista, (a) => a.risco)
+  return params.map((p) => ({ nome: p.nome, cor: p.cor, valor: c.get(p.nome) || 0 }))
 }

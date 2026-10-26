@@ -61,3 +61,11 @@ export function iniciaisNome(nome = '') {
 
 // Idade no atendimento (no link de visualização a idade já vem calculada, sem a data de nascimento)
 export const idadeAtd = (a) => (a.idade != null ? a.idade : idade(a.data_nascimento, a.data_atendimento))
+
+// Permanência em dias: da data de internação até a saída (ou até "ref", padrão hoje, se ainda internado)
+export function diasPermanencia(a, ref) {
+  if (!a.data_atendimento) return 0
+  const fim = a.data_desfecho || ref || hojeISO()
+  return Math.max(0, Math.round((new Date(fim + 'T12:00:00') - new Date(a.data_atendimento + 'T12:00:00')) / 86400000))
+}
+export const rotuloPermanencia = (n) => (n === 0 ? 'entrou hoje' : n === 1 ? '1 dia' : `${n} dias`)

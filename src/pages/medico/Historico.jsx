@@ -53,7 +53,7 @@ export default function Historico() {
 
       <AtendimentoForm open={form.open} inicial={form.inicial} onClose={() => setForm({ open: false, inicial: null })} onSaved={carregar} />
       <AtendimentoDetalhe a={det} onClose={() => setDet(null)}
-        onEditar={(a) => { setDet(null); setForm({ open: true, inicial: a }) }} onExcluido={() => { setDet(null); carregar() }} />
+        onEditar={(a) => { setDet(null); setForm({ open: true, inicial: a }) }} onExcluido={() => { setDet(null); carregar() }} onAlterado={() => { setDet(null); carregar() }} />
     </div>
   )
 }

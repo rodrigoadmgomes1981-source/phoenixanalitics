@@ -10,7 +10,7 @@ import { uid, hojeISO, addDias } from './utils'
 
 const CAMPOS_ATD = [
   'prontuario', 'iniciais', 'data_nascimento', 'data_atendimento', 'risco', 'setor',
-  'especialidades', 'cid', 'exames_grupos', 'exames', 'medicacoes_classes', 'medicacoes', 'desfecho', 'observacoes',
+  'especialidades', 'cid', 'exames_grupos', 'exames', 'medicacoes_classes', 'medicacoes', 'desfecho', 'data_desfecho', 'observacoes',
 ]
 const CAMPOS_LISTA = new Set(['especialidades', 'exames_grupos', 'medicacoes_classes'])
 
@@ -23,10 +23,32 @@ function limparAtendimento(a) {
     else if (v === undefined || v === '') v = null
     o[k] = v
   }
+  // Permanência: sem desfecho = paciente segue internado; com desfecho, a data de saída é obrigatória
+  if (!o.desfecho) o.data_desfecho = null
+  else if (!o.data_desfecho) o.data_desfecho = hojeISO()
+  if (o.data_desfecho && o.data_atendimento && o.data_desfecho < o.data_atendimento) o.data_desfecho = o.data_atendimento
   if (o.iniciais) o.iniciais = o.iniciais.toUpperCase()
   if (o.cid) o.cid = o.cid.toUpperCase()
   return o
 }
+
+/* Filtro de período comum:
+   - padrão: pacientes que DERAM ENTRADA no período (data_atendimento entre de e ate)
+   - sobrepor: pacientes que estiveram internados em algum dia do período (inclui quem entrou antes)
+   - ativos: só quem ainda não teve alta */
+export function filtrarPeriodo(l, { de, ate, sobrepor, ativos } = {}) {
+  let x = l
+  if (ativos) x = x.filter((a) => !a.desfecho)
+  if (sobrepor) {
+    if (ate) x = x.filter((a) => a.data_atendimento <= ate)
+    if (de) x = x.filter((a) => !a.data_desfecho || a.data_desfecho >= de)
+  } else {
+    if (de) x = x.filter((a) => a.data_atendimento >= de)
+    if (ate) x = x.filter((a) => a.data_atendimento <= ate)
+  }
+  return x.slice().sort((a, b) => (b.data_atendimento + b.created_at).localeCompare(a.data_atendimento + a.created_at))
+}
+const altaPor = (p) => ({ alta_por_id: p.id, alta_por_nome: p.nome })
 
 /* ---------------------- Links de visualização ---------------------- */
 export function novoToken() {
@@ -46,12 +68,12 @@ const idadeEm = (nasc, ref) => {
 const anonimizar = (a) => ({
   id: a.id, data_atendimento: a.data_atendimento, risco: a.risco, setor: a.setor,
   especialidades: a.especialidades || [], exames_grupos: a.exames_grupos || [], medicacoes_classes: a.medicacoes_classes || [],
-  cid: a.cid, desfecho: a.desfecho, idade: idadeEm(a.data_nascimento, a.data_atendimento),
+  cid: a.cid, desfecho: a.desfecho, data_desfecho: a.data_desfecho, idade: idadeEm(a.data_nascimento, a.data_atendimento),
   medico_id: a.medico_id, medico_nome: a.medico_nome, created_at: a.created_at,
 })
 
 /* ----------------------------- MODO DEMO ----------------------------- */
-const DB_KEY = 'phoenix_checklist_demo_v4'
+const DB_KEY = 'phoenix_checklist_demo_v5'
 const SESSAO_KEY = 'phoenix_checklist_demo_sessao'
 
 function seed() {
@@ -105,6 +127,11 @@ function seed() {
       const temEsp = Math.random() < (grave ? 0.6 : 0.25)
       const setor = grave ? pick(setores, [0.4, 0.6]) : pick(setores, [0.8, 0.2])
       const desfecho = grave ? pick(desf, [0.02, 0.01, 0.27, 0.2, 0.5]) : pick(desf, [0.06, 0.04, 0.72, 0.05, 0.13])
+      // Permanência simulada: observação costuma sair no mesmo dia ou no seguinte; internação fica mais tempo
+      const permanencia = setor === setores[0]
+        ? (Math.random() < 0.7 ? 0 : 1 + Math.floor(Math.random() * 2))
+        : 1 + Math.floor(Math.pow(Math.random(), 1.6) * (grave ? 12 : 7))
+      const saida = addDias(dia, permanencia)
       const criado = d === 0
         ? new Date(agora - (n - i) * 35 * 60000)
         : new Date(`${dia}T${String(7 + Math.floor((i / n) * 15)).padStart(2, '0')}:${String(Math.floor(Math.random() * 60)).padStart(2, '0')}:00`)
@@ -122,7 +149,8 @@ function seed() {
         exames: null,
         medicacoes_classes: sorteioVarios(medsC.slice(0, grave ? 26 : 12), grave ? 4 : 2, 0.92),
         medicacoes: null,
-        desfecho: d === 0 && i > 3 ? null : (d < 3 && Math.random() < 0.06 ? null : desfecho),
+        desfecho: saida > hoje ? null : desfecho,
+        data_desfecho: saida > hoje ? null : saida,
         observacoes: null,
         medico_id: med.id,
         medico_nome: med.nome,
@@ -191,24 +219,35 @@ const demo = {
   async getConfig() { return mergeConfig(lerDB().config) },
   async saveConfig(c) { const db = lerDB(); db.config = c; salvarDB(db) },
 
-  async listAtendimentos({ de, ate, medicoId } = {}) {
-    const p = await demo.currentProfile()
+  // Médicos veem todos os pacientes da unidade (o paciente segue internado entre plantões)
+  async listAtendimentos({ medicoId, ...f } = {}) {
     let l = lerDB().atendimentos
-    if (p.role !== 'admin') l = l.filter((a) => a.medico_id === p.id)
     if (medicoId) l = l.filter((a) => a.medico_id === medicoId)
-    if (de) l = l.filter((a) => a.data_atendimento >= de)
-    if (ate) l = l.filter((a) => a.data_atendimento <= ate)
-    return espera(l.slice().sort((a, b) => (b.data_atendimento + b.created_at).localeCompare(a.data_atendimento + a.created_at)))
+    return espera(filtrarPeriodo(l, f))
+  },
+  async buscarInternado(prontuario, excetoId) {
+    const pr = String(prontuario || '').trim()
+    if (!pr) return null
+    return lerDB().atendimentos.find((a) => a.prontuario === pr && !a.desfecho && a.id !== excetoId) || null
   },
   async saveAtendimento(a) {
     const db = lerDB(); const p = await demo.currentProfile(); const dados = limparAtendimento(a)
+    const extra = a._altaNova && dados.desfecho ? altaPor(p) : {}
     if (a.id) {
       const x = db.atendimentos.find((y) => y.id === a.id)
-      if (p.role !== 'admin' && x.medico_id !== p.id) throw new Error('Sem permissão.')
-      Object.assign(x, dados, { updated_at: new Date().toISOString() })
+      Object.assign(x, dados, extra, { updated_at: new Date().toISOString() })
     } else {
-      db.atendimentos.push({ ...dados, id: uid(), medico_id: p.id, medico_nome: p.nome, created_at: new Date().toISOString(), updated_at: null })
+      db.atendimentos.push({ ...dados, ...extra, id: uid(), medico_id: p.id, medico_nome: p.nome, created_at: new Date().toISOString(), updated_at: null })
     }
+    salvarDB(db)
+  },
+  async darAlta(id, desfecho, data) {
+    const db = lerDB(); const p = await demo.currentProfile()
+    const x = db.atendimentos.find((y) => y.id === id)
+    Object.assign(x, desfecho
+      ? { desfecho, data_desfecho: data < x.data_atendimento ? x.data_atendimento : data, ...altaPor(p) }
+      : { desfecho: null, data_desfecho: null, alta_por_id: null, alta_por_nome: null },
+    { updated_at: new Date().toISOString() })
     salvarDB(db)
   },
   async deleteAtendimento(id) {
@@ -244,7 +283,7 @@ const demo = {
       link: { nome: l.nome, expires_at: l.expires_at },
       config: db.config, parametros: db.parametros,
       medicos: db.users.filter((u) => u.role === 'medico' && u.ativo).map(({ id, nome, role, ativo }) => ({ id, nome, role, ativo })),
-      atendimentos: db.atendimentos.filter((a) => a.data_atendimento >= de && a.data_atendimento <= ate).map(anonimizar),
+      atendimentos: filtrarPeriodo(db.atendimentos, { de, ate, sobrepor: true }).map(anonimizar),
     }
   },
 }
@@ -255,6 +294,7 @@ function traduzErro(e) {
   if (/Invalid login credentials/i.test(m)) return 'E-mail ou senha inválidos.'
   if (/Email not confirmed/i.test(m)) return 'E-mail ainda não confirmado.'
   if (/row-level security/i.test(m)) return 'Sem permissão para esta ação.'
+  if (/schema cache|does not exist/i.test(m)) return 'O banco ainda não foi atualizado. Rode no Supabase o script SQL de atualização mais recente (pasta supabase/).'
   if (/duplicate key/i.test(m)) return 'Registro duplicado.'
   if (/Failed to fetch|NetworkError/i.test(m)) return 'Sem conexão com o servidor. Verifique sua internet.'
   return m
@@ -311,21 +351,40 @@ const sb = {
   },
   async saveConfig(c) { ok(await supabase.from('config').upsert({ id: 1, dados: c })) },
 
-  async listAtendimentos({ de, ate, medicoId } = {}) {
+  async listAtendimentos({ de, ate, medicoId, sobrepor, ativos } = {}) {
     let q = supabase.from('atendimentos').select('*')
-    if (de) q = q.gte('data_atendimento', de)
-    if (ate) q = q.lte('data_atendimento', ate)
+    if (ativos) q = q.is('desfecho', null)
+    if (sobrepor) {
+      if (ate) q = q.lte('data_atendimento', ate)
+      if (de) q = q.or(`data_desfecho.is.null,data_desfecho.gte.${de}`)
+    } else {
+      if (de) q = q.gte('data_atendimento', de)
+      if (ate) q = q.lte('data_atendimento', ate)
+    }
     if (medicoId) q = q.eq('medico_id', medicoId)
     q = q.order('data_atendimento', { ascending: false }).order('created_at', { ascending: false }).limit(5000)
     return ok(await q)
   },
+  async buscarInternado(prontuario, excetoId) {
+    const pr = String(prontuario || '').trim()
+    if (!pr) return null
+    let q = supabase.from('atendimentos').select('*').eq('prontuario', pr).is('desfecho', null).limit(1)
+    if (excetoId) q = q.neq('id', excetoId)
+    return ok(await q)[0] || null
+  },
   async saveAtendimento(a) {
     const dados = limparAtendimento(a)
-    if (a.id) ok(await supabase.from('atendimentos').update({ ...dados, updated_at: new Date().toISOString() }).eq('id', a.id))
-    else {
-      const p = await sb.currentProfile()
-      ok(await supabase.from('atendimentos').insert({ ...dados, medico_id: p.id, medico_nome: p.nome }))
-    }
+    const p = await sb.currentProfile()
+    const extra = a._altaNova && dados.desfecho ? altaPor(p) : {}
+    if (a.id) ok(await supabase.from('atendimentos').update({ ...dados, ...extra, updated_at: new Date().toISOString() }).eq('id', a.id))
+    else ok(await supabase.from('atendimentos').insert({ ...dados, ...extra, medico_id: p.id, medico_nome: p.nome }))
+  },
+  async darAlta(id, desfecho, data) {
+    const p = await sb.currentProfile()
+    const patch = desfecho
+      ? { desfecho, data_desfecho: data, ...altaPor(p) }
+      : { desfecho: null, data_desfecho: null, alta_por_id: null, alta_por_nome: null }
+    ok(await supabase.from('atendimentos').update({ ...patch, updated_at: new Date().toISOString() }).eq('id', id))
   },
   async deleteAtendimento(id) { ok(await supabase.from('atendimentos').delete().eq('id', id)) },
 
@@ -367,14 +426,14 @@ function criarVisualizador(token) {
     async currentProfile() { return null },
     async listParametros() { return (meta?.parametros || []).slice().sort((a, b) => a.ordem - b.ordem) },
     async getConfig() { return mergeConfig(meta?.config) },
-    async listAtendimentos({ de, ate } = {}) {
+    async listAtendimentos({ de, ate, sobrepor, ativos } = {}) {
       const a = ate || hojeISO()
-      const d = de || addDias(a, -365)
-      const r = await buscar(d, a)
-      return r.atendimentos.slice().sort((x, y) => (y.data_atendimento + y.created_at).localeCompare(x.data_atendimento + x.created_at))
+      const d = de || (ativos ? a : addDias(a, -365))
+      const r = await buscar(d, a) // o servidor devolve quem esteve internado em algum dia do período
+      return filtrarPeriodo(r.atendimentos, { de: d, ate: a, sobrepor: sobrepor || ativos, ativos })
     },
     async listUsuarios() { return meta?.medicos || [] },
-    saveAtendimento: negar, deleteAtendimento: negar, saveParametro: negar, saveConfig: negar,
+    saveAtendimento: negar, darAlta: negar, buscarInternado: negar, deleteAtendimento: negar, saveParametro: negar, saveConfig: negar,
     createUsuario: negar, updateUsuario: negar, listLinks: negar, createLink: negar,
   }
 }

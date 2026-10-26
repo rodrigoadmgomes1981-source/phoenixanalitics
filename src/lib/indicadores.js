@@ -93,3 +93,28 @@ export function porDiaSemana(lista, de, ate) {
   // começa na segunda
   return [1, 2, 3, 4, 5, 6, 0].map((i) => ({ nome: nomes[i], valor: ocorr[i] ? tot[i] / ocorr[i] : 0 }))
 }
+
+/* ---------- Permanência / ocupação ---------- */
+const difDias = (a, b) => Math.round((new Date(b + 'T12:00:00') - new Date(a + 'T12:00:00')) / 86400000)
+const internadoNoFimDo = (a, dia) => a.data_atendimento <= dia && (!a.data_desfecho || a.data_desfecho > dia)
+
+/** Censo: pacientes internados ao fim de cada dia do período (lista deve vir com "sobrepor"). */
+export function censoDiario(lista, de, ate) {
+  const out = []
+  for (let d = de; d <= ate; d = addDias(d, 1)) out.push({ dia: d, valor: lista.filter((a) => internadoNoFimDo(a, d)).length })
+  return out
+}
+
+/** Permanência das altas ocorridas no período (em dias; 0 = alta no mesmo dia). */
+export function permanencia(lista, de, ate) {
+  const saidas = lista.filter((a) => a.data_desfecho && a.data_desfecho >= de && a.data_desfecho <= ate)
+  const dias = saidas.map((a) => difDias(a.data_atendimento, a.data_desfecho)).sort((x, y) => x - y)
+  if (!dias.length) return { n: 0, media: null, mediana: null, longas: 0 }
+  return {
+    n: dias.length,
+    media: dias.reduce((s, x) => s + x, 0) / dias.length,
+    mediana: dias[Math.floor(dias.length / 2)],
+    longas: dias.filter((x) => x >= 7).length,
+  }
+}
+export const diasInternado = (a, ref) => difDias(a.data_atendimento, a.data_desfecho || ref)

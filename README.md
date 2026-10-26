@@ -7,7 +7,7 @@ Sistema web responsivo (React + Vite) para o monitoramento diário dos atendimen
 
 | Perfil | O que faz |
 |---|---|
-| **Médico** | Registra os atendimentos do plantão (prontuário, iniciais, nascimento, data, classificação de risco, setor, apoio de especialista, CID, exames, medicações, desfecho e observações). Vê o plantão do dia, os desfechos pendentes e o próprio histórico. Edita os próprios registros. |
+| **Médico** | Inclui o paciente uma vez (data de internação); ele aparece todos os dias no plantão de qualquer médico até alguém registrar a alta. Registra (prontuário, iniciais, nascimento, data, classificação de risco, setor, apoio de especialista, CID, exames, medicações, desfecho e observações). Vê o plantão do dia, os desfechos pendentes e o próprio histórico. Edita os próprios registros. |
 | **Administrador** | Painel com indicadores do período (risco, setor, desfecho, especialistas, volume diário, produção por médico e quem já preencheu hoje). Consulta, filtra, edita, exclui e exporta registros (Excel/CSV). Gerencia parâmetros (listas de seleção com cor e ordem, campos visíveis/obrigatórios, dados da unidade) e usuários. |
 
 ## Link de visualização (Painel + Analytics)
@@ -20,6 +20,7 @@ não saem do banco (a função `view_dados` devolve só a idade e os campos agre
 
 1. `supabase/atualizacao-01-exames-medicacoes.sql`
 2. `supabase/atualizacao-02-links-visualizacao.sql`
+3. `supabase/atualizacao-03-permanencia.sql` — paciente fica na lista diária até a alta
 
 ## Rodar localmente
 

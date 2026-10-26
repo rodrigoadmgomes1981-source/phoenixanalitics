@@ -2,13 +2,13 @@ import { useEffect, useMemo, useState } from 'react'
 import { useApp } from '../context'
 import { api } from '../lib/api'
 import { CAMPOS } from '../lib/defaults'
-import { hojeISO, idade } from '../lib/utils'
+import { diasPermanencia, fmtData, hojeISO, idade, rotuloPermanencia } from '../lib/utils'
 import { Field, Sheet } from './ui'
 import Icon from './Icon'
 
 const VAZIO = {
   prontuario: '', iniciais: '', data_nascimento: '', data_atendimento: '', risco: null, setor: null,
-  especialidades: [], cid: '', exames_grupos: [], exames: '', medicacoes_classes: [], medicacoes: '', desfecho: null, observacoes: '',
+  especialidades: [], cid: '', exames_grupos: [], exames: '', medicacoes_classes: [], medicacoes: '', desfecho: null, data_desfecho: '', observacoes: '',
 }
 
 export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, onSaved }) {
@@ -30,7 +30,8 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
 
   const campo = (k) => config.campos[k] || { visivel: true, obrigatorio: false }
   const vis = (k) => campo(k).visivel !== false || k === 'data_atendimento'
-  const obr = (k) => !!campo(k).obrigatorio || k === 'data_atendimento'
+  // desfecho nunca é obrigatório na inclusão: o paciente fica internado até a alta
+  const obr = (k) => k !== 'desfecho' && (!!campo(k).obrigatorio || k === 'data_atendimento')
   const label = (k) => CAMPOS.find((c) => c.key === k)?.label
   const set = (k, v) => { setF((x) => ({ ...x, [k]: v })); if (erros[k]) setErros((e) => ({ ...e, [k]: null })) }
 
@@ -54,6 +55,8 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
     }
     if (f.data_nascimento && f.data_atendimento && f.data_nascimento > f.data_atendimento) e.data_nascimento = 'Data posterior ao atendimento'
     if (f.data_atendimento && f.data_atendimento > hojeISO()) e.data_atendimento = 'Data futura não permitida'
+    if (f.desfecho && f.data_desfecho && f.data_desfecho < f.data_atendimento) e.data_desfecho = 'Alta antes da internação'
+    if (f.desfecho && f.data_desfecho && f.data_desfecho > hojeISO()) e.data_desfecho = 'Data futura não permitida'
     setErros(e)
     return Object.keys(e).length === 0
   }
@@ -66,8 +69,15 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
     }
     setSalvando(true)
     try {
-      await api.saveAtendimento(f)
-      toast(inicial?.id ? 'Atendimento atualizado.' : 'Atendimento registrado.')
+      // Evita incluir de novo um paciente que já está internado
+      const jaInternado = await api.buscarInternado(f.prontuario, inicial?.id)
+      if (jaInternado) {
+        setErros((e) => ({ ...e, prontuario: `Já internado desde ${fmtData(jaInternado.data_atendimento)} (${jaInternado.iniciais || 'sem iniciais'})` }))
+        toast(`Prontuário ${f.prontuario} já está internado desde ${fmtData(jaInternado.data_atendimento)}. Abra o paciente na lista do plantão.`, 'erro')
+        return
+      }
+      await api.saveAtendimento({ ...f, _altaNova: !!f.desfecho && !inicial?.desfecho })
+      toast(inicial?.id ? 'Paciente atualizado.' : f.desfecho ? 'Atendimento registrado com alta.' : 'Paciente incluído. Ele ficará na lista diária até a alta.')
       onSaved?.()
       if (continuar) {
         setF({ ...VAZIO, data_atendimento: f.data_atendimento })
@@ -89,7 +99,7 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
   }
 
   return (
-    <Sheet open={open} onClose={onClose} title={inicial?.id ? 'Editar atendimento' : 'Novo atendimento'}
+    <Sheet open={open} onClose={onClose} title={inicial?.id ? 'Editar paciente' : 'Incluir paciente'}
       footer={<>
         {!inicial?.id && <button className="btn btn-ghost" disabled={salvando} onClick={() => salvar(true)}>Salvar e novo</button>}
         <button className="btn btn-primary btn-grow" disabled={salvando} onClick={() => salvar(false)}>
@@ -218,21 +228,25 @@ export default function AtendimentoForm({ open, inicial, dataPadrao, onClose, on
         </section>
 
         <section className="form-sec">
-          <h3><span>4</span>Desfecho</h3>
+          <h3><span>4</span>Alta / desfecho</h3>
           {vis('desfecho') && (
-            <Field label={label('desfecho')} obrigatorio={obr('desfecho')} erro={erros.desfecho}
-              hint={!obr('desfecho') ? 'Pode ficar pendente e ser preenchido depois' : null}>
+            <Field label={label('desfecho')} erro={erros.desfecho}
+              hint={!f.desfecho ? 'Deixe “Segue internado”: o paciente aparece todo dia no plantão até alguém registrar a alta.' : null}>
               <div className="chips">
-                {!obr('desfecho') && (
-                  <button type="button" className={'chip chip-pend' + (!f.desfecho ? ' on' : '')} onClick={() => set('desfecho', null)}>
-                    <Icon name="clock" size={14} />Pendente
-                  </button>
-                )}
+                <button type="button" className={'chip chip-int' + (!f.desfecho ? ' on' : '')} onClick={() => { set('desfecho', null); set('data_desfecho', '') }}>
+                  <span className="pulse" />Segue internado
+                </button>
                 {opcoes('desfecho', f.desfecho).map((s) => (
                   <button type="button" key={s.id} className={'chip' + (f.desfecho === s.nome ? ' on' : '')}
-                    onClick={() => set('desfecho', s.nome)}>{s.nome}</button>
+                    onClick={() => { set('desfecho', s.nome); if (!f.data_desfecho) set('data_desfecho', hojeISO() < f.data_atendimento ? f.data_atendimento : hojeISO()) }}>{s.nome}</button>
                 ))}
               </div>
+            </Field>
+          )}
+          {f.desfecho && (
+            <Field label="Data da alta" obrigatorio erro={erros.data_desfecho}
+              hint={f.data_desfecho && f.data_atendimento ? `Permanência: ${rotuloPermanencia(diasPermanencia(f)).replace('entrou hoje', 'mesmo dia')}` : null}>
+              <input type="date" value={f.data_desfecho || ''} min={f.data_atendimento} max={hojeISO()} onChange={(e) => set('data_desfecho', e.target.value)} />
             </Field>
           )}
           {vis('observacoes') && (

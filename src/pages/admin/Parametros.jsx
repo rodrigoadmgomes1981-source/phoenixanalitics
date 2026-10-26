@@ -115,11 +115,11 @@ function Campos() {
       </div>
       <div className="campos-head"><span>Campo</span><span>Exibir</span><span>Obrigatório</span></div>
       <ul className="campos-list">
-        {CAMPOS.map(({ key, label, fixo }) => (
+        {CAMPOS.map(({ key, label, fixo, semObrigatorio }) => (
           <li key={key}>
-            <span>{label}{fixo && <small className="muted"> · fixo</small>}</span>
+            <span>{label}{fixo && <small className="muted"> · fixo</small>}{semObrigatorio && <small className="muted"> · preenchido na alta</small>}</span>
             <label className="switch"><input type="checkbox" disabled={fixo} checked={fixo || c.campos[key]?.visivel !== false} onChange={(e) => set(key, 'visivel', e.target.checked)} /><span /></label>
-            <label className="switch"><input type="checkbox" disabled={fixo || c.campos[key]?.visivel === false} checked={fixo || !!c.campos[key]?.obrigatorio} onChange={(e) => set(key, 'obrigatorio', e.target.checked)} /><span /></label>
+            <label className="switch"><input type="checkbox" disabled={fixo || semObrigatorio || c.campos[key]?.visivel === false} checked={fixo || (!semObrigatorio && !!c.campos[key]?.obrigatorio)} onChange={(e) => set(key, 'obrigatorio', e.target.checked)} /><span /></label>
           </li>
         ))}
       </ul>
