@@ -408,6 +408,15 @@ const sb = {
 }
 
 const base = DEMO ? demo : sb
+// Avisa a interface (ex.: contador de internados no menu) sempre que um paciente muda
+for (const k of ['saveAtendimento', 'darAlta', 'deleteAtendimento']) {
+  const f = base[k]
+  base[k] = async (...args) => {
+    const r = await f.apply(base, args)
+    window.dispatchEvent(new Event('atendimentos:mudou'))
+    return r
+  }
+}
 let impl = base
 
 /** Modo somente leitura acessado por link: expõe apenas o necessário para Painel e Analytics. */

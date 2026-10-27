@@ -496,3 +496,22 @@ a.btn { text-decoration: none; }
 .longos li { display: flex; justify-content: space-between; gap: 8px; }
 .longos b { color: var(--warn); }
 .longos b.ok { color: var(--ink-2); }
+
+/* ---------- Aba Internados ---------- */
+.nav-badge { margin-left: auto; min-width: 24px; height: 22px; padding: 0 7px; border-radius: 99px; background: rgba(255,255,255,.16); color: #fff; font: 700 12px/22px var(--body); text-align: center; }
+.nav-item.on .nav-badge { background: #fff; color: var(--teal-2); }
+.bn-ico { position: relative; display: inline-flex; }
+.bn-ico .nav-badge { position: absolute; top: -6px; left: 14px; margin: 0; min-width: 18px; height: 17px; padding: 0 5px; font-size: 10.5px; line-height: 17px; background: var(--teal); color: #fff; }
+.bottomnav button { min-width: 0; }
+.bottomnav button span:last-child { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 0 2px; }
+.internados-filtros { display: flex; flex-direction: column; gap: 10px; }
+@media (min-width: 960px) {
+  .cards-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+  .internados-filtros { flex-direction: row; align-items: center; flex-wrap: wrap; }
+  .internados-filtros .chips-scroll { margin: 0; padding: 0; flex: 1 1 100%; }
+  .internados-filtros .toolbar { flex: 1; }
+}
+@media (min-width: 1300px) { .cards-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 400px) { .bottomnav button { font-size: 10px; } }
+.bottomnav.bn-6 button { font-size: 10px; letter-spacing: -.2px; }
+.bottomnav.bn-6 button span:last-child { padding: 0; }

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useApp } from '../context'
-import { DEMO } from '../lib/api'
+import { api, DEMO } from '../lib/api'
 import Icon from './Icon'
 import { Spinner, Toasts } from './ui'
 import { iniciaisNome } from '../lib/utils'
@@ -13,18 +13,21 @@ import Registros from '../pages/admin/Registros'
 import Parametros from '../pages/admin/Parametros'
 import Usuarios from '../pages/admin/Usuarios'
 import LinksPage from '../pages/admin/Links'
+import Internados from '../pages/Internados'
 
 const ABAS = {
   medico: [
     { id: 'hoje', label: 'Plantão', icon: 'home', C: Hoje },
+    { id: 'internados', label: 'Internados', icon: 'bed', C: Internados, contador: true },
     { id: 'historico', label: 'Histórico', icon: 'list', C: Historico },
     { id: 'perfil', label: 'Perfil', icon: 'user', C: Perfil },
   ],
   admin: [
     { id: 'painel', label: 'Painel', icon: 'home', C: Painel },
     { id: 'analytics', label: 'Analytics', icon: 'trend', C: Analytics },
+    { id: 'internados', label: 'Internados', icon: 'bed', C: Internados, contador: true },
     { id: 'registros', label: 'Registros', icon: 'list', C: Registros },
-    { id: 'parametros', label: 'Parâmetros', icon: 'sliders', C: Parametros },
+    { id: 'parametros', label: 'Parâmetros', curto: 'Ajustes', icon: 'sliders', C: Parametros },
     { id: 'usuarios', label: 'Usuários', icon: 'users', C: Usuarios },
     { id: 'links', label: 'Compartilhar', icon: 'share', C: LinksPage, soDesktop: true },
     { id: 'perfil', label: 'Perfil', icon: 'user', C: Perfil, soDesktop: true },
@@ -48,6 +51,19 @@ export default function Shell({ onAtualizar }) {
     window.addEventListener('hashchange', f)
     return () => window.removeEventListener('hashchange', f)
   }, [abas])
+
+  // Contador de pacientes sem alta no menu (atualiza a cada inclusão/alta e a cada 2 minutos)
+  const [nInternados, setNInternados] = useState(null)
+  useEffect(() => {
+    if (viewer) return
+    let vivo = true
+    const contarInternados = () => api.listAtendimentos({ ativos: true }).then((l) => vivo && setNInternados(l.length)).catch(() => {})
+    contarInternados()
+    window.addEventListener('atendimentos:mudou', contarInternados)
+    const t = setInterval(contarInternados, 120000)
+    return () => { vivo = false; window.removeEventListener('atendimentos:mudou', contarInternados); clearInterval(t) }
+  }, [viewer])
+  const badge = (a) => (a.contador && nInternados != null ? <b className="nav-badge">{nInternados}</b> : null)
 
   const ir = (id) => { window.location.hash = '/' + id; setAba(id); window.scrollTo({ top: 0 }) }
   const Atual = abas.find((a) => a.id === aba)?.C || abas[0].C
@@ -78,7 +94,7 @@ export default function Shell({ onAtualizar }) {
         </div>
         {abas.map((a) => (
           <button key={a.id} className={'nav-item' + (aba === a.id ? ' on' : '')} onClick={() => ir(a.id)}>
-            <Icon name={a.icon} />{a.label}
+            <Icon name={a.icon} />{a.label}{badge(a)}
           </button>
         ))}
         {viewer && (
@@ -101,10 +117,10 @@ export default function Shell({ onAtualizar }) {
         {pronto ? <Atual ir={ir} /> : <Spinner />}
       </main>
 
-      <nav className="bottomnav" aria-label="Navegação">
+      <nav className={'bottomnav' + (abas.filter((a) => !a.soDesktop).length > 5 ? ' bn-6' : '')} aria-label="Navegação">
         {abas.filter((a) => !a.soDesktop).map((a) => (
           <button key={a.id} className={aba === a.id ? 'on' : ''} onClick={() => ir(a.id)}>
-            <Icon name={a.icon} size={22} /><span>{a.label}</span>
+            <span className="bn-ico"><Icon name={a.icon} size={22} />{badge(a)}</span><span>{a.curto || a.label}</span>
           </button>
         ))}
       </nav>
