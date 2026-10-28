@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react'
-import { api, usarVisualizacao } from './lib/api'
+import { api, permissoesDo, usarVisualizacao } from './lib/api'
 import { supabase } from './lib/supabase'
 import { AppProvider } from './context'
 import Login from './pages/Login'
@@ -45,7 +45,7 @@ function Visualizador({ token }) {
   }
   const atualizar = () => { estado.v.limparCache(); setVersao((x) => x + 1) }
   return (
-    <AppProvider key={versao} profile={{ id: 'viewer', nome: estado.link.nome, role: 'viewer' }} onLogout={null}>
+    <AppProvider key={versao} profile={{ id: 'viewer', nome: estado.link.nome, role: 'viewer', ...permissoesDo(estado.link) }} onLogout={null}>
       <Shell onAtualizar={atualizar} />
     </AppProvider>
   )

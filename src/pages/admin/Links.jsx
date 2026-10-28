@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useApp } from '../../context'
-import { api, DEMO } from '../../lib/api'
+import { api, DEMO, ABAS_VISUALIZACAO, PERMISSOES_PADRAO, permissoesDo } from '../../lib/api'
 import { fmtData, fmtHora } from '../../lib/utils'
 import Icon from '../../components/Icon'
 import { Confirm, Field, Sheet, Spinner, Segmented } from '../../components/ui'
@@ -11,6 +11,44 @@ const VALIDADES = [
   { value: '90', label: '90 dias' },
   { value: '0', label: 'Sem validade' },
 ]
+
+/** Escolha do que o link libera: telas e dados sensíveis. */
+function Permissoes({ valor, onChange }) {
+  const toggleAba = (id) => {
+    const abas = valor.abas.includes(id) ? valor.abas.filter((x) => x !== id) : [...valor.abas, id]
+    onChange({ ...valor, abas: ABAS_VISUALIZACAO.map((a) => a.id).filter((x) => abas.includes(x)) })
+  }
+  return (
+    <div className="stack perm-box">
+      <Field label="Telas liberadas" obrigatorio hint="Escolha pelo menos uma.">
+        <div className="chips">
+          {ABAS_VISUALIZACAO.map((a) => {
+            const on = valor.abas.includes(a.id)
+            return <button type="button" key={a.id} className={'chip' + (on ? ' on' : '')} aria-pressed={on} onClick={() => toggleAba(a.id)}>{on && <Icon name="check" size={14} />}{a.label}</button>
+          })}
+        </div>
+      </Field>
+      <div className="perm-row">
+        <div><strong>Prontuário e iniciais do paciente</strong><span className="muted small">Aparecem nos cartões de Internados e no detalhe.</span></div>
+        <label className="switch"><input type="checkbox" checked={valor.mostrar_identificacao} onChange={(e) => onChange({ ...valor, mostrar_identificacao: e.target.checked })} /><span /></label>
+      </div>
+      <div className="perm-row">
+        <div><strong>Nome dos médicos</strong><span className="muted small">Quem incluiu o paciente e o desempenho por médico.</span></div>
+        <label className="switch"><input type="checkbox" checked={valor.mostrar_medicos} onChange={(e) => onChange({ ...valor, mostrar_medicos: e.target.checked })} /><span /></label>
+      </div>
+      <p className="muted small">Nunca são exibidos: data de nascimento (só a idade), observações e campos de texto livre. As permissões são aplicadas no servidor — o que estiver desligado nem chega ao navegador de quem abre o link.</p>
+    </div>
+  )
+}
+
+export function resumoPermissoes(l) {
+  const p = permissoesDo(l)
+  return [
+    ...ABAS_VISUALIZACAO.filter((a) => p.abas.includes(a.id)).map((a) => a.label),
+    p.mostrar_identificacao ? 'Prontuário e iniciais' : 'Sem identificação',
+    p.mostrar_medicos ? 'Nomes dos médicos' : 'Sem nomes dos médicos',
+  ]
+}
 
 export const urlDoLink = (token) => `${window.location.origin}/v/${token}`
 
@@ -36,6 +74,7 @@ export function Links() {
   const [criado, setCriado] = useState(null)
   const [excluir, setExcluir] = useState(null)
   const [salvando, setSalvando] = useState(false)
+  const [editPerm, setEditPerm] = useState(null)
 
   const carregar = useCallback(async () => {
     try { setLista(await api.listLinks()) } catch (e) { toast(e.message, 'erro'); setLista([]) }
@@ -56,7 +95,8 @@ export function Links() {
     if (!novo.nome.trim()) return toast('Dê um nome ao link (ex.: Secretaria de Saúde).', 'erro')
     setSalvando(true)
     try {
-      const l = await api.createLink({ nome: novo.nome.trim(), dias: Number(novo.dias) || null })
+      if (!novo.perm.abas.length) { setSalvando(false); return toast('Libere pelo menos uma tela.', 'erro') }
+      const l = await api.createLink({ nome: novo.nome.trim(), dias: Number(novo.dias) || null, ...novo.perm })
       setNovo(null); setCriado(l); carregar()
     } catch (e) { toast(e.message, 'erro') } finally { setSalvando(false) }
   }
@@ -69,10 +109,10 @@ export function Links() {
       <div className="card links-intro">
         <div>
           <h2 className="card-title"><Icon name="eye" size={18} />Links de visualização</h2>
-          <p className="muted small">Quem recebe o link vê apenas o <strong>Painel</strong> e o <strong>Analytics</strong>, sem login e sem poder alterar nada. Prontuário, iniciais, data de nascimento e observações não são exibidos.</p>
+          <p className="muted small">Quem recebe o link vê, sem login e sem poder alterar nada, só as telas que você liberar (Painel, Internados e/ou Analytics). Em cada link você escolhe também se aparecem prontuário/iniciais e o nome dos médicos.</p>
           {DEMO && <p className="small warn-txt mt-s">No modo demonstração o link só abre neste mesmo navegador.</p>}
         </div>
-        <button className="btn btn-primary" onClick={() => setNovo({ nome: '', dias: '30' })}><Icon name="plus" size={18} />Novo link</button>
+        <button className="btn btn-primary" onClick={() => setNovo({ nome: '', dias: '30', perm: { ...PERMISSOES_PADRAO } })}><Icon name="plus" size={18} />Novo link</button>
       </div>
 
       {!lista ? <Spinner /> : lista.length === 0 ? (
@@ -89,6 +129,7 @@ export function Links() {
                   <span className={'tag ' + st.cls}>{st.txt}</span>
                 </div>
                 <code className="link-url">{urlDoLink(l.token)}</code>
+                <div className="perm-tags">{resumoPermissoes(l).map((t) => <span key={t} className="tag">{t}</span>)}</div>
                 <p className="muted small">
                   Criado em {fmtData(l.created_at)} · {l.expires_at ? `válido até ${fmtData(l.expires_at)}` : 'sem validade'}
                   {' · '}{l.ultimo_acesso ? `último acesso ${fmtData(l.ultimo_acesso)} ${fmtHora(l.ultimo_acesso)}` : 'nunca acessado'}
@@ -97,6 +138,7 @@ export function Links() {
                   <button className="btn btn-soft" disabled={!ok} onClick={() => copiar(l)}><Icon name="copy" size={16} />Copiar</button>
                   <button className="btn btn-ghost" disabled={!ok} onClick={() => compartilhar(l)}><Icon name="share" size={16} />Enviar</button>
                   <a className={'btn btn-ghost' + (ok ? '' : ' disabled')} href={ok ? urlDoLink(l.token) : undefined} target="_blank" rel="noreferrer"><Icon name="eye" size={16} />Abrir</a>
+                  <button className="btn btn-ghost" onClick={() => setEditPerm({ id: l.id, nome: l.nome, perm: permissoesDo(l) })}><Icon name="sliders" size={16} />Permissões</button>
                   <span className="grow" />
                   <button className="btn btn-link" onClick={() => alternar(l)}>{l.ativo ? 'Revogar' : 'Reativar'}</button>
                   <button className="icon-btn sm" onClick={() => setExcluir(l)} aria-label="Excluir link"><Icon name="trash" size={16} /></button>
@@ -117,9 +159,19 @@ export function Links() {
             <Field label="Validade">
               <Segmented value={novo.dias} onChange={(dias) => setNovo({ ...novo, dias })} options={VALIDADES} />
             </Field>
-            <p className="muted small">Você pode revogar o link a qualquer momento, e ele para de funcionar na hora.</p>
+            <Permissoes valor={novo.perm} onChange={(perm) => setNovo({ ...novo, perm })} />
+            <p className="muted small">Você pode revogar o link ou mudar as permissões a qualquer momento; vale na hora para quem abrir ou atualizar o link.</p>
           </div>
         )}
+      </Sheet>
+
+      <Sheet open={!!editPerm} onClose={() => setEditPerm(null)} title={`Permissões · ${editPerm?.nome || ''}`}
+        footer={<><button className="btn btn-ghost" onClick={() => setEditPerm(null)}>Cancelar</button>
+          <button className="btn btn-primary btn-grow" onClick={async () => {
+            if (!editPerm.perm.abas.length) return toast('Libere pelo menos uma tela.', 'erro')
+            try { await api.updateLink(editPerm.id, editPerm.perm); toast('Permissões atualizadas.'); setEditPerm(null); carregar() } catch (e) { toast(e.message, 'erro') }
+          }}>Salvar permissões</button></>}>
+        {editPerm && <Permissoes valor={editPerm.perm} onChange={(perm) => setEditPerm({ ...editPerm, perm })} />}
       </Sheet>
 
       <Sheet open={!!criado} onClose={() => setCriado(null)} title="Link criado"

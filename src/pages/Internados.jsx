@@ -64,7 +64,7 @@ export default function Internados() {
           <p className="muted small">Todos os pacientes sem alta, de qualquer data de entrada · atualizado agora</p>
         </div>
         <div className="row-gap">
-          <button className="btn btn-ghost" onClick={carregar}><Icon name="refresh" size={18} />Atualizar</button>
+          {profile.role !== 'viewer' && <button className="btn btn-ghost" onClick={carregar}><Icon name="refresh" size={18} />Atualizar</button>}
           {profile.role === 'admin' && <button className="btn btn-soft" disabled={!visiveis.length} onClick={exportar}><Icon name="download" size={18} />Excel</button>}
         </div>
       </div>
@@ -88,7 +88,7 @@ export default function Internados() {
             <div className="toolbar">
               <div className="search">
                 <Icon name="search" size={18} />
-                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder="Prontuário, iniciais, CID ou médico" />
+                <input value={busca} onChange={(e) => setBusca(e.target.value)} placeholder={profile.role === 'viewer' ? 'CID ou médico' : 'Prontuário, iniciais, CID ou médico'} />
               </div>
             </div>
             <Segmented value={ordem} onChange={setOrdem} options={ORDENS} />

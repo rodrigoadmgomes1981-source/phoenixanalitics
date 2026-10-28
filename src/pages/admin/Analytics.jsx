@@ -247,6 +247,7 @@ export default function Analytics({ ir }) {
               </div>
             </section>
 
+            {A.meds.length > 0 && (
             <section className="card span-3">
               <h2 className="card-title">Desempenho por médico</h2>
               <div className="table-wrap flat">
@@ -270,6 +271,7 @@ export default function Analytics({ ir }) {
               </div>
               <p className="muted small mt-s">“Plantões” = dias distintos com ao menos um registro do médico no período.</p>
             </section>
+            )}
           </div>
         </>
       )}

@@ -70,7 +70,7 @@ export default function Painel({ ir }) {
           <p className="muted">{iv.de === iv.ate ? fmtData(iv.de) : `${fmtData(iv.de)} a ${fmtData(iv.ate)}`}</p>
         </div>
         <div className="row-gap">
-          <button className="btn btn-soft" onClick={() => ir('analytics')}><Icon name="trend" size={18} />Analytics</button>
+          {(profile.role !== 'viewer' || profile.abas?.includes('analytics')) && <button className="btn btn-soft" onClick={() => ir('analytics')}><Icon name="trend" size={18} />Analytics</button>}
           {profile.role === 'admin' && <button className="btn btn-ghost" onClick={() => ir('links')}><Icon name="share" size={18} />Compartilhar</button>}
         </div>
       </div>
@@ -116,7 +116,7 @@ export default function Painel({ ir }) {
             <section className="card"><h2 className="card-title">Desfecho das altas</h2><BarList itens={d.desfecho} total={d.saidas.length} vazio="Nenhuma alta no período" /></section>
             <section className="card"><h2 className="card-title">Entradas por setor</h2><BarList itens={d.setor} total={d.total} /></section>
             <section className="card"><h2 className="card-title">Apoio de especialista</h2><BarList itens={d.esp} /></section>
-            <section className="card"><h2 className="card-title">Inclusões por médico</h2><BarList itens={d.porMed} total={d.total} /></section>
+            {d.porMed.length > 0 && <section className="card"><h2 className="card-title">Inclusões por médico</h2><BarList itens={d.porMed} total={d.total} /></section>}
           </div>
         </>
       )}

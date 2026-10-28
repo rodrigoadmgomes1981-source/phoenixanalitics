@@ -19,9 +19,10 @@ export function AtendimentoCard({ a, onOpen, mostrarMedico, mostrarData, dia: re
     <button className={'atd-card' + (saiuNoDia ? ' atd-saiu' : '')} style={{ '--c': cor }} onClick={() => onOpen(a)}>
       <div className="atd-main">
         <div className="atd-top">
-          <strong className="atd-ini">{a.iniciais || '—'}</strong>
+          {/* No link de visualização não há iniciais nem prontuário (dados anonimizados) */}
+          <strong className="atd-ini">{a.iniciais || (a.prontuario ? '—' : 'Paciente')}</strong>
           {id != null && <span className="atd-meta">{id} anos</span>}
-          <span className="atd-meta">· Pront. {a.prontuario || '—'}</span>
+          {a.prontuario && <span className="atd-meta">· Pront. {a.prontuario}</span>}
         </div>
         <div className="atd-tags">
           <RiscoTag nome={a.risco} cor={cor} compact />

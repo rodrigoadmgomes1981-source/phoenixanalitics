@@ -515,3 +515,11 @@ a.btn { text-decoration: none; }
 @media (max-width: 400px) { .bottomnav button { font-size: 10px; } }
 .bottomnav.bn-6 button { font-size: 10px; letter-spacing: -.2px; }
 .bottomnav.bn-6 button span:last-child { padding: 0; }
+
+/* ---------- Permissões dos links ---------- */
+.perm-box { background: #f7f9fc; border: 1px solid var(--line-2); border-radius: 12px; padding: 14px; }
+.perm-row { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 10px 0; border-top: 1px solid var(--line-2); }
+.perm-row > div { display: grid; gap: 2px; }
+.perm-row strong { font-size: 14px; }
+.perm-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.sem-bottomnav .content { padding-bottom: 24px; }

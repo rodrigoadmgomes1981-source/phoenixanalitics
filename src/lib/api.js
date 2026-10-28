@@ -64,12 +64,30 @@ const idadeEm = (nasc, ref) => {
   if (d.getMonth() < n.getMonth() || (d.getMonth() === n.getMonth() && d.getDate() < n.getDate())) x--
   return x
 }
-// Só os campos necessários para Painel e Analytics — sem prontuário, iniciais, nascimento ou observações
-const anonimizar = (a) => ({
+/* Permissões de um link de visualização (o que cada link libera) */
+export const ABAS_VISUALIZACAO = [
+  { id: 'painel', label: 'Painel' },
+  { id: 'internados', label: 'Internados' },
+  { id: 'analytics', label: 'Analytics' },
+]
+export const PERMISSOES_PADRAO = { abas: ['painel', 'internados', 'analytics'], mostrar_identificacao: true, mostrar_medicos: true }
+// Links antigos (antes das permissões) ficam como eram: todas as telas, sem identificação do paciente
+export const permissoesDo = (l) => ({
+  abas: l.abas?.length ? l.abas : PERMISSOES_PADRAO.abas,
+  mostrar_identificacao: l.mostrar_identificacao ?? false,
+  mostrar_medicos: l.mostrar_medicos ?? true,
+})
+
+// Só o necessário para as telas liberadas. Nunca saem: data de nascimento (só a idade), observações, textos livres.
+const anonimizar = (a, perm = {}) => ({
   id: a.id, data_atendimento: a.data_atendimento, risco: a.risco, setor: a.setor,
   especialidades: a.especialidades || [], exames_grupos: a.exames_grupos || [], medicacoes_classes: a.medicacoes_classes || [],
   cid: a.cid, desfecho: a.desfecho, data_desfecho: a.data_desfecho, idade: idadeEm(a.data_nascimento, a.data_atendimento),
-  medico_id: a.medico_id, medico_nome: a.medico_nome, created_at: a.created_at,
+  prontuario: perm.mostrar_identificacao ? a.prontuario : null,
+  iniciais: perm.mostrar_identificacao ? a.iniciais : null,
+  medico_id: perm.mostrar_medicos ? a.medico_id : null,
+  medico_nome: perm.mostrar_medicos ? a.medico_nome : null,
+  created_at: a.created_at,
 })
 
 /* ----------------------------- MODO DEMO ----------------------------- */
@@ -267,9 +285,9 @@ const demo = {
   async resetDemo() { try { localStorage.removeItem(DB_KEY); localStorage.removeItem(SESSAO_KEY) } catch { /* ignora */ } },
 
   async listLinks() { return espera((lerDB().links || []).slice().sort((a, b) => b.created_at.localeCompare(a.created_at))) },
-  async createLink({ nome, dias }) {
+  async createLink({ nome, dias, ...perm }) {
     const db = lerDB(); db.links = db.links || []
-    const l = { id: uid(), token: novoToken(), nome, ativo: true, expires_at: expiraEm(dias), created_at: new Date().toISOString(), ultimo_acesso: null }
+    const l = { id: uid(), token: novoToken(), nome, ativo: true, expires_at: expiraEm(dias), created_at: new Date().toISOString(), ultimo_acesso: null, ...PERMISSOES_PADRAO, ...perm }
     db.links.push(l); salvarDB(db); return l
   },
   async updateLink(id, patch) { const db = lerDB(); Object.assign(db.links.find((l) => l.id === id), patch); salvarDB(db) },
@@ -279,11 +297,12 @@ const demo = {
     const l = (db.links || []).find((x) => x.token === token && x.ativo && (!x.expires_at || x.expires_at > new Date().toISOString()))
     if (!l) throw new Error('link_invalido')
     l.ultimo_acesso = new Date().toISOString(); salvarDB(db)
+    const perm = permissoesDo(l)
     return {
-      link: { nome: l.nome, expires_at: l.expires_at },
+      link: { nome: l.nome, expires_at: l.expires_at, ...perm },
       config: db.config, parametros: db.parametros,
-      medicos: db.users.filter((u) => u.role === 'medico' && u.ativo).map(({ id, nome, role, ativo }) => ({ id, nome, role, ativo })),
-      atendimentos: filtrarPeriodo(db.atendimentos, { de, ate, sobrepor: true }).map(anonimizar),
+      medicos: perm.mostrar_medicos ? db.users.filter((u) => u.role === 'medico' && u.ativo).map(({ id, nome, role, ativo }) => ({ id, nome, role, ativo })) : [],
+      atendimentos: filtrarPeriodo(db.atendimentos, { de, ate, sobrepor: true }).map((a) => anonimizar(a, perm)),
     }
   },
 }
@@ -395,8 +414,8 @@ const sb = {
   async resetDemo() {},
 
   async listLinks() { return ok(await supabase.from('view_links').select('*').order('created_at', { ascending: false })) },
-  async createLink({ nome, dias }) {
-    return ok(await supabase.from('view_links').insert({ nome, token: novoToken(), expires_at: expiraEm(dias) }).select().single())
+  async createLink({ nome, dias, ...perm }) {
+    return ok(await supabase.from('view_links').insert({ nome, token: novoToken(), expires_at: expiraEm(dias), ...PERMISSOES_PADRAO, ...perm }).select().single())
   },
   async updateLink(id, patch) { ok(await supabase.from('view_links').update(patch).eq('id', id)) },
   async deleteLink(id) { ok(await supabase.from('view_links').delete().eq('id', id)) },

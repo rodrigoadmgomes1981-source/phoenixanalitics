@@ -34,6 +34,7 @@ const ABAS = {
   ],
   viewer: [
     { id: 'painel', label: 'Painel', icon: 'home', C: Painel },
+    { id: 'internados', label: 'Internados', icon: 'bed', C: Internados, contador: true },
     { id: 'analytics', label: 'Analytics', icon: 'trend', C: Analytics },
   ],
 }
@@ -43,7 +44,8 @@ const lerHash = () => window.location.hash.replace('#/', '')
 export default function Shell({ onAtualizar }) {
   const { profile, config, toasts, pronto } = useApp()
   const viewer = profile.role === 'viewer'
-  const abas = ABAS[profile.role] || ABAS.medico
+  // No link de visualização, só as telas liberadas para aquele link
+  const abas = viewer ? ABAS.viewer.filter((a) => profile.abas?.includes(a.id)) : ABAS[profile.role] || ABAS.medico
   const [aba, setAba] = useState(() => (abas.some((a) => a.id === lerHash()) ? lerHash() : abas[0].id))
 
   useEffect(() => {
@@ -55,21 +57,20 @@ export default function Shell({ onAtualizar }) {
   // Contador de pacientes sem alta no menu (atualiza a cada inclusão/alta e a cada 2 minutos)
   const [nInternados, setNInternados] = useState(null)
   useEffect(() => {
-    if (viewer) return
     let vivo = true
     const contarInternados = () => api.listAtendimentos({ ativos: true }).then((l) => vivo && setNInternados(l.length)).catch(() => {})
     contarInternados()
     window.addEventListener('atendimentos:mudou', contarInternados)
     const t = setInterval(contarInternados, 120000)
     return () => { vivo = false; window.removeEventListener('atendimentos:mudou', contarInternados); clearInterval(t) }
-  }, [viewer])
+  }, [])
   const badge = (a) => (a.contador && nInternados != null ? <b className="nav-badge">{nInternados}</b> : null)
 
   const ir = (id) => { window.location.hash = '/' + id; setAba(id); window.scrollTo({ top: 0 }) }
   const Atual = abas.find((a) => a.id === aba)?.C || abas[0].C
 
   return (
-    <div className={'app' + (viewer ? ' viewer' : '')}>
+    <div className={'app' + (viewer ? ' viewer' : '') + (abas.filter((a) => !a.soDesktop).length > 1 ? '' : ' sem-bottomnav')}>
       <header className="topbar">
         <div className="brand">
           <img src="/logo-mark-white.png" alt="" className="brand-mark" />
@@ -117,13 +118,13 @@ export default function Shell({ onAtualizar }) {
         {pronto ? <Atual ir={ir} /> : <Spinner />}
       </main>
 
-      <nav className={'bottomnav' + (abas.filter((a) => !a.soDesktop).length > 5 ? ' bn-6' : '')} aria-label="Navegação">
+      {abas.filter((a) => !a.soDesktop).length > 1 && <nav className={'bottomnav' + (abas.filter((a) => !a.soDesktop).length > 5 ? ' bn-6' : '')} aria-label="Navegação">
         {abas.filter((a) => !a.soDesktop).map((a) => (
           <button key={a.id} className={aba === a.id ? 'on' : ''} onClick={() => ir(a.id)}>
             <span className="bn-ico"><Icon name={a.icon} size={22} />{badge(a)}</span><span>{a.curto || a.label}</span>
           </button>
         ))}
-      </nav>
+      </nav>}
       <Toasts itens={toasts} />
     </div>
   )
